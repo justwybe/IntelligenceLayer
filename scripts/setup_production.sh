@@ -261,10 +261,11 @@ print(f'FlashAttention: OK (shape {out.shape})')
     if [ -d "checkpoints/GR00T-N1.6-3B" ]; then
         run_test "GROOT model load" "$PROJECT_DIR/.venv/bin/python" -c "
 from gr00t.policy.gr00t_policy import Gr00tPolicy
+from gr00t.data.embodiment_tags import EmbodimentTag
 import torch
 policy = Gr00tPolicy(
     model_path='checkpoints/GR00T-N1.6-3B',
-    embodiment_tag='GR1',
+    embodiment_tag=EmbodimentTag.GR1,
     device='cuda',
 )
 print(f'GROOT model loaded. GPU mem: {torch.cuda.memory_allocated(0)/1e9:.1f} GB')
