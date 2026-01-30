@@ -109,11 +109,11 @@ def create_train_tab(
 
                 gr.Markdown("#### Hyperparameters")
                 with gr.Row():
-                    tr_lr = gr.Number(label="Learning Rate", value=1e-4)
+                    tr_lr = gr.Number(label="Learning Rate", value=1e-4, step=1e-6)
                     tr_max_steps = gr.Number(label="Max Steps", value=10000, precision=0)
                 with gr.Row():
                     tr_batch_size = gr.Number(label="Batch Size", value=64, precision=0)
-                    tr_weight_decay = gr.Number(label="Weight Decay", value=1e-5)
+                    tr_weight_decay = gr.Number(label="Weight Decay", value=1e-5, step=1e-6)
                 with gr.Row():
                     tr_warmup_ratio = gr.Number(label="Warmup Ratio", value=0.05)
                     tr_save_steps = gr.Number(label="Save Steps", value=1000, precision=0)
@@ -380,10 +380,14 @@ def create_train_tab(
             if resume_ckpt_path:
                 ckpt_parent = str(Path(resume_ckpt_path).parent)
                 # Override output_dir to the same dir so Trainer finds the checkpoint
+                replaced = False
                 for i, arg in enumerate(cmd):
-                    if arg == "--output_dir":
+                    if arg == "--output_dir" and i + 1 < len(cmd):
                         cmd[i + 1] = ckpt_parent
+                        replaced = True
                         break
+                if not replaced:
+                    cmd.extend(["--output_dir", ckpt_parent])
                 config["output_dir"] = ckpt_parent
 
             return config, cmd

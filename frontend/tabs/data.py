@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import os
+import shutil
 import tempfile
 import traceback
 from pathlib import Path
@@ -23,6 +24,9 @@ EMBODIMENT_CHOICES = [
     "robocasa_panda_omron",
     "behavior_r1_pro",
 ]
+
+# Track temp directory for episode viewer plots so we can clean up between calls
+_episode_tmpdir: str | None = None
 
 
 def _count_episodes(dataset_path: str) -> int | None:
@@ -62,8 +66,15 @@ def _load_episode_data(dataset_path: str, episode_index: int) -> dict:
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
 
+    global _episode_tmpdir
+
     result = {"video_path": None, "state_plot_path": None, "action_plot_path": None, "task_desc": "", "error": None}
-    tmpdir = None
+
+    # Clean up previous temp dir before creating a new one
+    if _episode_tmpdir is not None:
+        shutil.rmtree(_episode_tmpdir, ignore_errors=True)
+        _episode_tmpdir = None
+
     p = Path(dataset_path)
 
     if not p.exists():
@@ -105,7 +116,7 @@ def _load_episode_data(dataset_path: str, episode_index: int) -> dict:
     state_cols = [c for c in df.columns if c.startswith("observation.state")]
     if state_cols:
         try:
-            tmpdir = tempfile.mkdtemp()
+            _episode_tmpdir = tempfile.mkdtemp(prefix="wybe_episode_")
             fig, ax = plt.subplots(figsize=(8, 4))
             for col in state_cols:
                 vals = df[col].tolist()
@@ -124,19 +135,19 @@ def _load_episode_data(dataset_path: str, episode_index: int) -> dict:
             ax.legend(fontsize=6, ncol=2, loc="upper right")
             ax.grid(True, alpha=0.3)
             plt.tight_layout()
-            state_path = os.path.join(tmpdir, "state_plot.png")
+            state_path = os.path.join(_episode_tmpdir, "state_plot.png")
             fig.savefig(state_path, dpi=100)
             plt.close(fig)
             result["state_plot_path"] = state_path
-        except Exception:
-            pass
+        except Exception as exc:
+            result.setdefault("warnings", []).append(f"State plot failed: {exc}")
 
     # Plot action trajectories
     action_cols = [c for c in df.columns if c.startswith("action")]
     if action_cols:
         try:
-            if tmpdir is None:
-                tmpdir = tempfile.mkdtemp()
+            if _episode_tmpdir is None:
+                _episode_tmpdir = tempfile.mkdtemp(prefix="wybe_episode_")
             fig, ax = plt.subplots(figsize=(8, 4))
             for col in action_cols:
                 vals = df[col].tolist()
@@ -154,12 +165,12 @@ def _load_episode_data(dataset_path: str, episode_index: int) -> dict:
             ax.legend(fontsize=6, ncol=2, loc="upper right")
             ax.grid(True, alpha=0.3)
             plt.tight_layout()
-            action_path = os.path.join(tmpdir, "action_plot.png")
+            action_path = os.path.join(_episode_tmpdir, "action_plot.png")
             fig.savefig(action_path, dpi=100)
             plt.close(fig)
             result["action_plot_path"] = action_path
-        except Exception:
-            pass
+        except Exception as exc:
+            result.setdefault("warnings", []).append(f"Action plot failed: {exc}")
 
     # Read task description
     tasks_file = p / "meta" / "tasks.jsonl"
@@ -167,7 +178,7 @@ def _load_episode_data(dataset_path: str, episode_index: int) -> dict:
         try:
             # Get task_index from the episode data if available
             task_index = None
-            if "task_index" in df.columns:
+            if "task_index" in df.columns and len(df) > 0:
                 task_index = int(df["task_index"].iloc[0])
 
             tasks = []

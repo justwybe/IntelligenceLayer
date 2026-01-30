@@ -43,6 +43,12 @@ dependencies = [
 dev = [
     "ruff",
     "ipython",
+    "pytest>=8.0",
+    "pytest-timeout>=2.2",
+]
+frontend = [
+    "gradio>=5.0.0",
+    "plotly",
 ]
 tensorrt = [
     "onnx>=1.20.0",
@@ -51,10 +57,14 @@ tensorrt = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["gr00t*"]
+include = ["gr00t*", "frontend*"]
 
 [tool.uv.extra-build-dependencies]
 flash-attn = ["torch==2.7.0", "numpy==1.26.4"]
+
+[tool.pytest.ini_options]
+testpaths = ["frontend/tests"]
+timeout = 30
 
 [tool.ruff]
 line-length = 100

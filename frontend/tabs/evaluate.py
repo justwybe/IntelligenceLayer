@@ -145,13 +145,16 @@ def create_evaluate_tab(
                             interactive=False,
                         )
 
+                # Derive eval output dir from WYBE_DATA_DIR
+                _eval_base = os.path.join(
+                    os.environ.get("WYBE_DATA_DIR", os.path.expanduser("~/.wybe_studio")),
+                    "eval_outputs",
+                )
+
                 def launch_open_loop(dataset_path, model_path, embodiment, traj_ids_str, steps, action_horizon, proj):
                     pid = proj.get("id") if proj else None
                     if not pid:
                         return "Select a project first", ""
-
-                    save_dir = "/tmp/open_loop_eval"
-                    os.makedirs(save_dir, exist_ok=True)
 
                     config = {
                         "dataset_path": dataset_path,
@@ -166,6 +169,9 @@ def create_evaluate_tab(
                         run_type="evaluation",
                         config=config,
                     )
+
+                    save_dir = os.path.join(_eval_base, run_id)
+                    os.makedirs(save_dir, exist_ok=True)
 
                     venv_python = str(Path(project_root) / ".venv" / "bin" / "python")
                     cmd = [
@@ -203,7 +209,9 @@ def create_evaluate_tab(
                     return task_runner.status(run_id) if run_id else ""
 
                 def refresh_ol_gallery(run_id):
-                    save_dir = "/tmp/open_loop_eval"
+                    if not run_id:
+                        return []
+                    save_dir = os.path.join(_eval_base, run_id)
                     images = sorted(glob.glob(f"{save_dir}/*.jpeg")) + sorted(
                         glob.glob(f"{save_dir}/*.png")
                     )
@@ -317,10 +325,12 @@ def create_evaluate_tab(
                         config=config,
                     )
 
+                    venv_python = str(Path(project_root) / ".venv" / "bin" / "python")
                     if env_name == "BEHAVIOR":
-                        python_cmd = "python3"
+                        # BEHAVIOR may require a separate conda env; fall back to venv if available
+                        python_cmd = venv_python if Path(venv_python).exists() else "python3"
                     else:
-                        python_cmd = str(Path(project_root) / ".venv" / "bin" / "python")
+                        python_cmd = venv_python
 
                     cmd = [
                         python_cmd,
@@ -357,6 +367,7 @@ def create_evaluate_tab(
                     return task_runner.status(run_id) if run_id else ""
 
                 def refresh_sim_video(run_id):
+                    # Video output path is controlled by gr00t.eval.rollout_policy defaults
                     for pattern in ["/tmp/sim_eval_videos_*/*.mp4", "/tmp/sim_eval_videos_*/*.avi"]:
                         videos = sorted(glob.glob(pattern), key=os.path.getmtime)
                         if videos:

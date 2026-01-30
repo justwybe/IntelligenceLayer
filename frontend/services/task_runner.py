@@ -1,21 +1,25 @@
-from __future__ import annotations
-
 """TaskRunner — subprocess manager with DB-backed state tracking.
 
 Replaces ProcessManager with WorkspaceStore integration so that run status,
 metrics, and log paths persist across app restarts.
 """
 
+from __future__ import annotations
+
+from dataclasses import dataclass
+from datetime import datetime
+import logging
 import os
+from pathlib import Path
 import re
 import signal
 import subprocess
 import threading
-from dataclasses import dataclass, field
-from datetime import datetime
-from pathlib import Path
 
 from frontend.services.workspace import WorkspaceStore
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -54,9 +58,11 @@ class TaskRunner:
                 info = self._processes[run_id]
                 if info.process.poll() is None:
                     return f"Run {run_id} is already running (pid {info.process.pid})"
+                # Previous process finished — clean up stale entry
+                self._close_log_file(info)
 
             log_path = self._log_dir / f"{run_id}.log"
-            log_file = open(log_path, "w")
+            log_file = open(log_path, "w")  # noqa: SIM115
 
             try:
                 proc = subprocess.Popen(
@@ -94,6 +100,15 @@ class TaskRunner:
 
             return f"Run {run_id} launched (pid {proc.pid})"
 
+    @staticmethod
+    def _close_log_file(info: ProcessInfo) -> None:
+        """Safely close the log file handle for a ProcessInfo."""
+        try:
+            if info.log_file and not getattr(info.log_file, "closed", True):
+                info.log_file.close()
+        except Exception:
+            pass
+
     def _wait_for_exit(self, run_id: str) -> None:
         with self._lock:
             info = self._processes.get(run_id)
@@ -101,7 +116,9 @@ class TaskRunner:
             return
 
         retcode = info.process.wait()
-        info.log_file.close()
+
+        # Flush and close the log file before reading it
+        self._close_log_file(info)
 
         # Parse structured markers from the log
         metrics = self._parse_markers(info.log_path)
@@ -117,15 +134,22 @@ class TaskRunner:
         self.store.update_run(run_id, **updates)
 
         # Log activity
-        run = self.store.get_run(run_id)
-        if run:
-            self.store.log_activity(
-                run["project_id"],
-                f"run_{status}",
-                "run",
-                run_id,
-                f"{run['run_type']} run {status}",
-            )
+        try:
+            run = self.store.get_run(run_id)
+            if run:
+                self.store.log_activity(
+                    run["project_id"],
+                    f"run_{status}",
+                    "run",
+                    run_id,
+                    f"{run['run_type']} run {status}",
+                )
+        except Exception:
+            logger.exception("Failed to log activity for run %s", run_id)
+
+        # Remove from in-memory dict to prevent unbounded growth
+        with self._lock:
+            self._processes.pop(run_id, None)
 
     def _parse_markers(self, log_path: Path) -> dict:
         """Parse ##WYBE_METRIC:key=val,...## markers from log file."""
@@ -154,9 +178,10 @@ class TaskRunner:
             if info.process.poll() is not None:
                 return f"Run {run_id} already exited"
 
+        # Send SIGTERM to the process group
         try:
             os.killpg(os.getpgid(info.process.pid), signal.SIGTERM)
-        except ProcessLookupError:
+        except (ProcessLookupError, OSError):
             pass
 
         try:
@@ -164,15 +189,26 @@ class TaskRunner:
         except subprocess.TimeoutExpired:
             try:
                 os.killpg(os.getpgid(info.process.pid), signal.SIGKILL)
-            except ProcessLookupError:
+            except (ProcessLookupError, OSError):
                 pass
-            info.process.wait(timeout=3)
+            try:
+                info.process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                logger.warning("Run %s: process did not exit after SIGKILL", run_id)
+
+        # Close log file handle
+        self._close_log_file(info)
 
         self.store.update_run(
             run_id,
             status="stopped",
             completed_at=datetime.now().isoformat(),
         )
+
+        # Remove from in-memory dict
+        with self._lock:
+            self._processes.pop(run_id, None)
+
         return f"Run {run_id} stopped"
 
     # -- status / logs ---------------------------------------------------------
@@ -193,6 +229,12 @@ class TaskRunner:
         with self._lock:
             info = self._processes.get(run_id)
         if info is not None:
+            # Flush the log file so we can read latest output
+            try:
+                if info.log_file and not getattr(info.log_file, "closed", True):
+                    info.log_file.flush()
+            except Exception:
+                pass
             log_path = info.log_path
         else:
             # Fall back to DB-stored path
@@ -242,4 +284,6 @@ class TaskRunner:
                     completed_at=datetime.now().isoformat(),
                 )
                 cleaned.append(run["id"])
+        if cleaned:
+            logger.info("Cleaned up %d stale runs on startup: %s", len(cleaned), cleaned)
         return cleaned

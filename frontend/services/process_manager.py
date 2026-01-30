@@ -1,13 +1,17 @@
-from __future__ import annotations
-
 """Generic subprocess lifecycle manager for long-running tasks."""
 
+from __future__ import annotations
+
+from dataclasses import dataclass, field
+import logging
 import os
+from pathlib import Path
 import signal
 import subprocess
 import threading
-from dataclasses import dataclass, field
-from pathlib import Path
+
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -15,6 +19,7 @@ class ProcessInfo:
     task_type: str
     process: subprocess.Popen
     log_path: Path
+    log_file: object = field(default=None, repr=False)  # open file handle
     status: str = "running"  # running | completed | failed | stopped
 
 
@@ -26,6 +31,15 @@ class ProcessManager:
         self._lock = threading.Lock()
         self._log_dir = Path(log_dir)
         self._log_dir.mkdir(parents=True, exist_ok=True)
+
+    @staticmethod
+    def _close_log_file(info: ProcessInfo) -> None:
+        """Safely close the log file handle for a ProcessInfo."""
+        try:
+            if info.log_file and not getattr(info.log_file, "closed", True):
+                info.log_file.close()
+        except Exception:
+            pass
 
     def launch(
         self,
@@ -44,7 +58,8 @@ class ProcessManager:
                 info = self._processes[task_type]
                 if info.process.poll() is None:
                     return f"{task_type} is already running (pid {info.process.pid})"
-                # Previous process finished — allow relaunch
+                # Previous process finished — clean up stale entry
+                self._close_log_file(info)
 
             if log_path is None:
                 log_path = str(self._log_dir / f"{task_type}.log")
@@ -56,7 +71,7 @@ class ProcessManager:
             if env:
                 proc_env.update(env)
 
-            log_file = open(resolved_log, "w")
+            log_file = open(resolved_log, "w")  # noqa: SIM115
             try:
                 proc = subprocess.Popen(
                     cmd,
@@ -74,6 +89,7 @@ class ProcessManager:
                 task_type=task_type,
                 process=proc,
                 log_path=resolved_log,
+                log_file=log_file,
             )
 
             # Background thread to update status when process exits
@@ -90,6 +106,10 @@ class ProcessManager:
         if info is None:
             return
         retcode = info.process.wait()
+
+        # Close the log file handle
+        self._close_log_file(info)
+
         with self._lock:
             if info.status == "running":
                 info.status = "completed" if retcode == 0 else "failed"
@@ -106,7 +126,7 @@ class ProcessManager:
         # Send SIGTERM to the process group
         try:
             os.killpg(os.getpgid(info.process.pid), signal.SIGTERM)
-        except ProcessLookupError:
+        except (ProcessLookupError, OSError):
             pass
 
         try:
@@ -114,9 +134,15 @@ class ProcessManager:
         except subprocess.TimeoutExpired:
             try:
                 os.killpg(os.getpgid(info.process.pid), signal.SIGKILL)
-            except ProcessLookupError:
+            except (ProcessLookupError, OSError):
                 pass
-            info.process.wait(timeout=3)
+            try:
+                info.process.wait(timeout=3)
+            except subprocess.TimeoutExpired:
+                logger.warning("%s: process did not exit after SIGKILL", task_type)
+
+        # Close log file handle
+        self._close_log_file(info)
 
         with self._lock:
             info.status = "stopped"
@@ -141,6 +167,12 @@ class ProcessManager:
             info = self._processes.get(task_type)
         if info is None:
             return ""
+        # Flush log so we read latest output
+        try:
+            if info.log_file and not getattr(info.log_file, "closed", True):
+                info.log_file.flush()
+        except Exception:
+            pass
         try:
             text = info.log_path.read_text(errors="replace")
             lines = text.splitlines()
@@ -152,3 +184,17 @@ class ProcessManager:
         with self._lock:
             info = self._processes.get(task_type)
         return str(info.log_path) if info else None
+
+    def cleanup_dead(self) -> list[str]:
+        """Remove entries for processes that have exited. Returns cleaned task types."""
+        cleaned = []
+        with self._lock:
+            dead = [
+                k for k, v in self._processes.items()
+                if v.process.poll() is not None
+            ]
+            for k in dead:
+                info = self._processes.pop(k)
+                self._close_log_file(info)
+                cleaned.append(k)
+        return cleaned

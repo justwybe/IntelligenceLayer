@@ -211,7 +211,7 @@ def create_workbench_tab(
                     return "Server is not running. Start the server first."
                 import sys
 
-                sys.path.insert(0, server_manager._project_root)
+                sys.path.insert(0, server_manager.project_root)
                 from gr00t.policy.server_client import PolicyClient
 
                 client = PolicyClient(
@@ -233,7 +233,7 @@ def create_workbench_tab(
 
                 import sys
 
-                sys.path.insert(0, server_manager._project_root)
+                sys.path.insert(0, server_manager.project_root)
                 from gr00t.policy.server_client import PolicyClient
 
                 client = PolicyClient(

@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """WorkspaceStore — SQLite-backed persistence for Wybe Studio.
 
 Stores metadata for projects, datasets, runs, models, evaluations, and
@@ -7,14 +5,22 @@ activity logs.  All heavy data (checkpoints, datasets, videos) stays on
 the filesystem; the DB only records paths and metadata.
 """
 
+from __future__ import annotations
+
+from contextlib import contextmanager
 import json
+import logging
 import os
 import sqlite3
 import threading
-import uuid
-from datetime import datetime
-from pathlib import Path
 from typing import Any
+import uuid
+
+
+logger = logging.getLogger(__name__)
+
+# Schema version — bump when adding/changing tables
+_SCHEMA_VERSION = 2
 
 
 def _default_db_path() -> str:
@@ -44,82 +50,136 @@ class WorkspaceStore:
             self._local.conn = conn
         return conn
 
+    def close(self) -> None:
+        """Close the connection for the current thread."""
+        conn = getattr(self._local, "conn", None)
+        if conn is not None:
+            try:
+                conn.close()
+            except Exception:
+                pass
+            self._local.conn = None
+
+    @contextmanager
+    def _transaction(self):
+        """Context manager for atomic transactions.
+
+        Commits on success, rolls back on exception.
+        """
+        conn = self._conn
+        try:
+            yield conn
+            conn.commit()
+        except Exception:
+            conn.rollback()
+            raise
+
     # -- schema migration ------------------------------------------------------
 
     def _migrate(self) -> None:
         c = self._conn
-        c.executescript(
-            """
-            CREATE TABLE IF NOT EXISTS projects (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                embodiment_tag TEXT NOT NULL,
-                base_model TEXT DEFAULT 'nvidia/GR00T-N1.6-3B',
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                notes TEXT
-            );
 
-            CREATE TABLE IF NOT EXISTS datasets (
-                id TEXT PRIMARY KEY,
-                project_id TEXT REFERENCES projects(id),
-                name TEXT NOT NULL,
-                path TEXT NOT NULL,
-                source TEXT,
-                parent_dataset_id TEXT,
-                episode_count INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                metadata TEXT
-            );
-
-            CREATE TABLE IF NOT EXISTS models (
-                id TEXT PRIMARY KEY,
-                project_id TEXT REFERENCES projects(id),
-                name TEXT NOT NULL,
-                path TEXT NOT NULL,
-                source_run_id TEXT REFERENCES runs(id),
-                base_model TEXT,
-                embodiment_tag TEXT,
-                step INTEGER,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                notes TEXT
-            );
-
-            CREATE TABLE IF NOT EXISTS runs (
-                id TEXT PRIMARY KEY,
-                project_id TEXT REFERENCES projects(id),
-                run_type TEXT NOT NULL,
-                dataset_id TEXT REFERENCES datasets(id),
-                model_id TEXT REFERENCES models(id),
-                config TEXT NOT NULL,
-                status TEXT DEFAULT 'pending',
-                started_at TIMESTAMP,
-                completed_at TIMESTAMP,
-                log_path TEXT,
-                metrics TEXT,
-                pid INTEGER
-            );
-
-            CREATE TABLE IF NOT EXISTS evaluations (
-                id TEXT PRIMARY KEY,
-                run_id TEXT REFERENCES runs(id),
-                model_id TEXT REFERENCES models(id),
-                eval_type TEXT,
-                metrics TEXT,
-                artifacts TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-
-            CREATE TABLE IF NOT EXISTS activity_log (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                project_id TEXT REFERENCES projects(id),
-                event_type TEXT NOT NULL,
-                entity_type TEXT,
-                entity_id TEXT,
-                message TEXT,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-            );
-            """
+        # Create version tracking table
+        c.execute(
+            "CREATE TABLE IF NOT EXISTS schema_version (version INTEGER NOT NULL)"
         )
+        row = c.execute("SELECT version FROM schema_version").fetchone()
+        current_version = row[0] if row else 0
+
+        if current_version < 1:
+            c.executescript(
+                """
+                CREATE TABLE IF NOT EXISTS projects (
+                    id TEXT PRIMARY KEY,
+                    name TEXT NOT NULL,
+                    embodiment_tag TEXT NOT NULL,
+                    base_model TEXT DEFAULT 'nvidia/GR00T-N1.6-3B',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    notes TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS datasets (
+                    id TEXT PRIMARY KEY,
+                    project_id TEXT REFERENCES projects(id),
+                    name TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    source TEXT,
+                    parent_dataset_id TEXT,
+                    episode_count INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    metadata TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS models (
+                    id TEXT PRIMARY KEY,
+                    project_id TEXT REFERENCES projects(id),
+                    name TEXT NOT NULL,
+                    path TEXT NOT NULL,
+                    source_run_id TEXT REFERENCES runs(id),
+                    base_model TEXT,
+                    embodiment_tag TEXT,
+                    step INTEGER,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    notes TEXT
+                );
+
+                CREATE TABLE IF NOT EXISTS runs (
+                    id TEXT PRIMARY KEY,
+                    project_id TEXT REFERENCES projects(id),
+                    run_type TEXT NOT NULL,
+                    dataset_id TEXT REFERENCES datasets(id),
+                    model_id TEXT REFERENCES models(id),
+                    config TEXT NOT NULL,
+                    status TEXT DEFAULT 'pending',
+                    started_at TIMESTAMP,
+                    completed_at TIMESTAMP,
+                    log_path TEXT,
+                    metrics TEXT,
+                    pid INTEGER
+                );
+
+                CREATE TABLE IF NOT EXISTS evaluations (
+                    id TEXT PRIMARY KEY,
+                    run_id TEXT REFERENCES runs(id),
+                    model_id TEXT REFERENCES models(id),
+                    eval_type TEXT,
+                    metrics TEXT,
+                    artifacts TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+
+                CREATE TABLE IF NOT EXISTS activity_log (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    project_id TEXT REFERENCES projects(id),
+                    event_type TEXT NOT NULL,
+                    entity_type TEXT,
+                    entity_id TEXT,
+                    message TEXT,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                """
+            )
+
+        if current_version < 2:
+            # Add indexes for common query patterns
+            c.executescript(
+                """
+                CREATE INDEX IF NOT EXISTS idx_datasets_project ON datasets(project_id);
+                CREATE INDEX IF NOT EXISTS idx_runs_project ON runs(project_id);
+                CREATE INDEX IF NOT EXISTS idx_runs_status ON runs(status);
+                CREATE INDEX IF NOT EXISTS idx_models_project ON models(project_id);
+                CREATE INDEX IF NOT EXISTS idx_evaluations_run ON evaluations(run_id);
+                CREATE INDEX IF NOT EXISTS idx_evaluations_model ON evaluations(model_id);
+                CREATE INDEX IF NOT EXISTS idx_activity_project ON activity_log(project_id);
+                """
+            )
+
+        # Update version tracker
+        if current_version == 0:
+            c.execute("INSERT INTO schema_version (version) VALUES (?)", (_SCHEMA_VERSION,))
+        elif current_version < _SCHEMA_VERSION:
+            c.execute("UPDATE schema_version SET version = ?", (_SCHEMA_VERSION,))
+
         c.commit()
 
     # -- helpers ---------------------------------------------------------------
@@ -146,12 +206,17 @@ class WorkspaceStore:
         notes: str = "",
     ) -> str:
         pid = self._new_id()
-        self._conn.execute(
-            "INSERT INTO projects (id, name, embodiment_tag, base_model, notes) VALUES (?, ?, ?, ?, ?)",
-            (pid, name, embodiment_tag, base_model, notes),
-        )
-        self._conn.commit()
-        self.log_activity(pid, "project_created", "project", pid, f"Project '{name}' created")
+        with self._transaction():
+            self._conn.execute(
+                "INSERT INTO projects (id, name, embodiment_tag, base_model, notes) VALUES (?, ?, ?, ?, ?)",
+                (pid, name, embodiment_tag, base_model, notes),
+            )
+            self._conn.execute(
+                """INSERT INTO activity_log
+                   (project_id, event_type, entity_type, entity_id, message)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (pid, "project_created", "project", pid, f"Project '{name}' created"),
+            )
         return pid
 
     def list_projects(self) -> list[dict]:
@@ -167,13 +232,13 @@ class WorkspaceStore:
         return self._row_to_dict(row)
 
     def delete_project(self, project_id: str) -> None:
-        self._conn.execute("DELETE FROM activity_log WHERE project_id = ?", (project_id,))
-        self._conn.execute("DELETE FROM evaluations WHERE run_id IN (SELECT id FROM runs WHERE project_id = ?)", (project_id,))
-        self._conn.execute("DELETE FROM runs WHERE project_id = ?", (project_id,))
-        self._conn.execute("DELETE FROM models WHERE project_id = ?", (project_id,))
-        self._conn.execute("DELETE FROM datasets WHERE project_id = ?", (project_id,))
-        self._conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
-        self._conn.commit()
+        with self._transaction():
+            self._conn.execute("DELETE FROM activity_log WHERE project_id = ?", (project_id,))
+            self._conn.execute("DELETE FROM evaluations WHERE run_id IN (SELECT id FROM runs WHERE project_id = ?)", (project_id,))
+            self._conn.execute("DELETE FROM runs WHERE project_id = ?", (project_id,))
+            self._conn.execute("DELETE FROM models WHERE project_id = ?", (project_id,))
+            self._conn.execute("DELETE FROM datasets WHERE project_id = ?", (project_id,))
+            self._conn.execute("DELETE FROM projects WHERE id = ?", (project_id,))
 
     # -- datasets --------------------------------------------------------------
 
@@ -188,25 +253,28 @@ class WorkspaceStore:
         metadata: dict | None = None,
     ) -> str:
         did = self._new_id()
-        self._conn.execute(
-            """INSERT INTO datasets
-               (id, project_id, name, path, source, parent_dataset_id, episode_count, metadata)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (
-                did,
-                project_id,
-                name,
-                path,
-                source,
-                parent_dataset_id,
-                episode_count,
-                json.dumps(metadata) if metadata else None,
-            ),
-        )
-        self._conn.commit()
-        self.log_activity(
-            project_id, "dataset_registered", "dataset", did, f"Dataset '{name}' registered"
-        )
+        with self._transaction():
+            self._conn.execute(
+                """INSERT INTO datasets
+                   (id, project_id, name, path, source, parent_dataset_id, episode_count, metadata)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
+                (
+                    did,
+                    project_id,
+                    name,
+                    path,
+                    source,
+                    parent_dataset_id,
+                    episode_count,
+                    json.dumps(metadata) if metadata else None,
+                ),
+            )
+            self._conn.execute(
+                """INSERT INTO activity_log
+                   (project_id, event_type, entity_type, entity_id, message)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (project_id, "dataset_registered", "dataset", did, f"Dataset '{name}' registered"),
+            )
         return did
 
     def list_datasets(self, project_id: str | None = None) -> list[dict]:
@@ -238,16 +306,19 @@ class WorkspaceStore:
         model_id: str | None = None,
     ) -> str:
         rid = self._new_id()
-        self._conn.execute(
-            """INSERT INTO runs
-               (id, project_id, run_type, dataset_id, model_id, config, status)
-               VALUES (?, ?, ?, ?, ?, ?, 'pending')""",
-            (rid, project_id, run_type, dataset_id, model_id, json.dumps(config)),
-        )
-        self._conn.commit()
-        self.log_activity(
-            project_id, "run_created", "run", rid, f"{run_type} run created"
-        )
+        with self._transaction():
+            self._conn.execute(
+                """INSERT INTO runs
+                   (id, project_id, run_type, dataset_id, model_id, config, status)
+                   VALUES (?, ?, ?, ?, ?, ?, 'pending')""",
+                (rid, project_id, run_type, dataset_id, model_id, json.dumps(config)),
+            )
+            self._conn.execute(
+                """INSERT INTO activity_log
+                   (project_id, event_type, entity_type, entity_id, message)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (project_id, "run_created", "run", rid, f"{run_type} run created"),
+            )
         return rid
 
     def update_run(self, run_id: str, **kwargs: Any) -> None:
@@ -260,7 +331,7 @@ class WorkspaceStore:
         set_clause = ", ".join(f"{k} = ?" for k in updates)
         values = list(updates.values()) + [run_id]
         self._conn.execute(
-            f"UPDATE runs SET {set_clause} WHERE id = ?", values
+            f"UPDATE runs SET {set_clause} WHERE id = ?", values  # noqa: S608
         )
         self._conn.commit()
 
@@ -307,16 +378,19 @@ class WorkspaceStore:
         notes: str = "",
     ) -> str:
         mid = self._new_id()
-        self._conn.execute(
-            """INSERT INTO models
-               (id, project_id, name, path, source_run_id, base_model, embodiment_tag, step, notes)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
-            (mid, project_id, name, path, source_run_id, base_model, embodiment_tag, step, notes),
-        )
-        self._conn.commit()
-        self.log_activity(
-            project_id, "model_registered", "model", mid, f"Model '{name}' registered"
-        )
+        with self._transaction():
+            self._conn.execute(
+                """INSERT INTO models
+                   (id, project_id, name, path, source_run_id, base_model, embodiment_tag, step, notes)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (mid, project_id, name, path, source_run_id, base_model, embodiment_tag, step, notes),
+            )
+            self._conn.execute(
+                """INSERT INTO activity_log
+                   (project_id, event_type, entity_type, entity_id, message)
+                   VALUES (?, ?, ?, ?, ?)""",
+                (project_id, "model_registered", "model", mid, f"Model '{name}' registered"),
+            )
         return mid
 
     def list_models(self, project_id: str | None = None) -> list[dict]:
@@ -355,7 +429,7 @@ class WorkspaceStore:
             (
                 eid,
                 run_id,
-                model_id,
+                model_id or None,  # Store NULL instead of empty string for FK safety
                 eval_type,
                 json.dumps(metrics),
                 json.dumps(artifacts) if artifacts else None,
@@ -364,16 +438,17 @@ class WorkspaceStore:
         self._conn.commit()
         return eid
 
-    def list_evaluations(self, model_id: str | None = None) -> list[dict]:
+    def list_evaluations(self, model_id: str | None = None, run_id: str | None = None) -> list[dict]:
+        sql = "SELECT * FROM evaluations WHERE 1=1"
+        params: list = []
         if model_id:
-            rows = self._conn.execute(
-                "SELECT * FROM evaluations WHERE model_id = ? ORDER BY created_at DESC",
-                (model_id,),
-            ).fetchall()
-        else:
-            rows = self._conn.execute(
-                "SELECT * FROM evaluations ORDER BY created_at DESC"
-            ).fetchall()
+            sql += " AND model_id = ?"
+            params.append(model_id)
+        if run_id:
+            sql += " AND run_id = ?"
+            params.append(run_id)
+        sql += " ORDER BY created_at DESC"
+        rows = self._conn.execute(sql, params).fetchall()
         return self._rows_to_list(rows)
 
     # -- activity log ----------------------------------------------------------

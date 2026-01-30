@@ -536,27 +536,16 @@ def create_deploy_tab(
                 except Exception:
                     pass
 
-                # Store parsed metrics in DB on completion
+                # Store parsed metrics in DB on completion (once)
                 if status == "completed" and results:
-                    for r in results:
-                        metrics = {}
-                        for k, v in r.items():
-                            try:
-                                metrics[k] = float(v.replace("ms", "").replace("Hz", "").strip())
-                            except (ValueError, AttributeError):
-                                metrics[k] = v
-                        metrics["mode"] = r.get("Mode", "")
-                        try:
-                            metrics["e2e_ms"] = float(r.get("E2E", "0").replace("ms", "").strip())
-                        except (ValueError, AttributeError):
-                            pass
-                        try:
-                            metrics["frequency_hz"] = float(r.get("Frequency", "0").replace("Hz", "").strip())
-                        except (ValueError, AttributeError):
-                            pass
+                    # Check if we already saved results for this run
+                    existing_evals = store.list_evaluations(run_id=run_id)
+                    already_saved = any(
+                        e.get("eval_type") == "benchmark" for e in existing_evals
+                    )
 
-                    # Update run metrics with first result summary
-                    if results:
+                    if not already_saved:
+                        # Update run metrics with first result summary
                         summary = {
                             "mode": results[0].get("Mode", ""),
                             "e2e_ms": results[0].get("E2E", ""),
@@ -564,19 +553,32 @@ def create_deploy_tab(
                         }
                         store.update_run(run_id, metrics=summary)
 
-                    # Save evaluation records
-                    pid = proj.get("id") if proj else None
-                    if pid:
-                        for r in results:
-                            eval_metrics = {}
-                            for k, v in r.items():
-                                eval_metrics[k.lower().replace(" ", "_")] = v
-                            store.save_evaluation(
-                                run_id=run_id,
-                                model_id="",
-                                eval_type="benchmark",
-                                metrics=eval_metrics,
-                            )
+                        # Resolve model_id from run config
+                        bench_model_id = None
+                        pid_for_eval = proj.get("id") if proj else None
+                        if pid_for_eval:
+                            run_data = store.get_run(run_id)
+                            if run_data:
+                                try:
+                                    run_config = json.loads(run_data["config"]) if isinstance(run_data["config"], str) else run_data["config"]
+                                    bench_model_path = run_config.get("model_path", "")
+                                    for m in store.list_models(project_id=pid_for_eval):
+                                        if m["path"] == bench_model_path:
+                                            bench_model_id = m["id"]
+                                            break
+                                except (json.JSONDecodeError, KeyError):
+                                    pass
+
+                            for r in results:
+                                eval_metrics = {}
+                                for k, v in r.items():
+                                    eval_metrics[k.lower().replace(" ", "_")] = v
+                                store.save_evaluation(
+                                    run_id=run_id,
+                                    model_id=bench_model_id or "",
+                                    eval_type="benchmark",
+                                    metrics=eval_metrics,
+                                )
 
             return status_msg, table_data if table_data else [], chart
 

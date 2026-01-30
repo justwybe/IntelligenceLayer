@@ -1,9 +1,17 @@
 """Manages the GROOT inference server lifecycle."""
 
-import sys
+import logging
 from pathlib import Path
+import sys
+import threading
 
 from frontend.services.process_manager import ProcessManager
+
+
+logger = logging.getLogger(__name__)
+
+# Lock for sys.path mutations
+_sys_path_lock = threading.Lock()
 
 
 class ServerManager:
@@ -17,10 +25,16 @@ class ServerManager:
 
     def __init__(self, process_manager: ProcessManager, project_root: str = ""):
         self._pm = process_manager
-        self._project_root = project_root or str(Path(__file__).resolve().parents[2])
+        self.project_root = project_root or str(Path(__file__).resolve().parents[2])
         self.current_model_path: str = ""
         self.current_embodiment_tag: str = ""
         self.current_port: int = 5555
+
+    def _ensure_project_on_path(self) -> None:
+        """Add project root to sys.path if not already present (thread-safe)."""
+        with _sys_path_lock:
+            if self.project_root not in sys.path:
+                sys.path.insert(0, self.project_root)
 
     def start(
         self,
@@ -32,7 +46,7 @@ class ServerManager:
         if not model_path:
             return "Error: model_path is required"
 
-        venv_python = str(Path(self._project_root) / ".venv" / "bin" / "python")
+        venv_python = str(Path(self.project_root) / ".venv" / "bin" / "python")
         cmd = [
             venv_python,
             "-m",
@@ -47,7 +61,7 @@ class ServerManager:
         result = self._pm.launch(
             self.TASK_TYPE,
             cmd,
-            cwd=self._project_root,
+            cwd=self.project_root,
         )
         if "launched" in result:
             self.current_model_path = model_path
@@ -58,7 +72,7 @@ class ServerManager:
     def stop(self) -> str:
         # Try graceful kill via PolicyClient first
         try:
-            sys.path.insert(0, self._project_root)
+            self._ensure_project_on_path()
             from gr00t.policy.server_client import PolicyClient
             client = PolicyClient(
                 host="localhost", port=self.current_port, timeout_ms=2000
@@ -75,7 +89,7 @@ class ServerManager:
 
     def ping(self) -> bool:
         try:
-            sys.path.insert(0, self._project_root)
+            self._ensure_project_on_path()
             from gr00t.policy.server_client import PolicyClient
             client = PolicyClient(
                 host="localhost", port=self.current_port, timeout_ms=2000
