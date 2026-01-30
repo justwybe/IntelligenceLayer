@@ -23,4 +23,12 @@ pip install isaacsim==5.1.0.0
 cd /root/IntelligenceLayer
 set -a && source .env && set +a
 
+# Install Gradio frontend dependencies
+.venv/bin/python -m pip install gradio plotly 2>/dev/null || true
+
+# Launch Gradio frontend in the background
+echo "Starting Gradio frontend on port 7860..."
+nohup .venv/bin/python -m frontend.app > /tmp/intelligenceLayer_logs/gradio.log 2>&1 &
+echo "Gradio PID: $!"
+
 echo "Startup complete."
