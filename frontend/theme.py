@@ -51,14 +51,14 @@ class WybeTheme(gr.themes.Base):
             SLATE_500, SLATE_600, SLATE_700, SLATE_800, SLATE_900,
             SLATE_950, name="slate",
         )
-        blue = Color(
-            "#eff6ff", "#dbeafe", "#bfdbfe", "#93c5fd", BLUE_400,
-            BLUE_500, BLUE_600, BLUE_700, "#1e40af", "#1e3a8a",
-            "#172554", name="blue",
+        green = Color(
+            "#f0fdf4", "#dcfce7", "#bbf7d0", "#86efac", GREEN_400,
+            GREEN_500, "#16a34a", "#15803d", "#166534", "#14532d",
+            "#052e16", name="green",
         )
 
         super().__init__(
-            primary_hue=blue,
+            primary_hue=green,
             secondary_hue=slate,
             neutral_hue=slate,
             font=[GoogleFont("Inter"), "ui-sans-serif", "system-ui", "sans-serif"],
@@ -66,54 +66,54 @@ class WybeTheme(gr.themes.Base):
         )
 
         # Background layers
-        self.body_background_fill = SLATE_900
-        self.body_background_fill_dark = SLATE_950
-        self.background_fill_primary = SLATE_800
-        self.background_fill_primary_dark = SLATE_900
-        self.background_fill_secondary = SLATE_700
-        self.background_fill_secondary_dark = SLATE_800
+        self.body_background_fill = "#0a0a0a"
+        self.body_background_fill_dark = "#050505"
+        self.background_fill_primary = "#141414"
+        self.background_fill_primary_dark = "#0a0a0a"
+        self.background_fill_secondary = "#1e1e1e"
+        self.background_fill_secondary_dark = "#141414"
 
         # Text
-        self.body_text_color = SLATE_200
-        self.body_text_color_dark = SLATE_200
-        self.body_text_color_subdued = SLATE_500
-        self.body_text_color_subdued_dark = SLATE_500
+        self.body_text_color = "#d4d4d4"
+        self.body_text_color_dark = "#d4d4d4"
+        self.body_text_color_subdued = "#737373"
+        self.body_text_color_subdued_dark = "#737373"
 
         # Block styling
-        self.block_background_fill = SLATE_800
-        self.block_background_fill_dark = SLATE_800
-        self.block_border_color = SLATE_700
-        self.block_border_color_dark = SLATE_700
+        self.block_background_fill = "#141414"
+        self.block_background_fill_dark = "#141414"
+        self.block_border_color = "#262626"
+        self.block_border_color_dark = "#262626"
         self.block_border_width = "1px"
-        self.block_label_text_color = SLATE_400
-        self.block_label_text_color_dark = SLATE_400
+        self.block_label_text_color = "#737373"
+        self.block_label_text_color_dark = "#737373"
         self.block_radius = "12px"
         self.block_padding = "16px"
         self.block_shadow = "0 1px 3px 0 rgba(0,0,0,0.3)"
 
         # Inputs
-        self.input_background_fill = SLATE_900
-        self.input_background_fill_dark = SLATE_900
-        self.input_border_color = SLATE_600
-        self.input_border_color_dark = SLATE_600
-        self.input_border_color_focus = BLUE_500
-        self.input_border_color_focus_dark = BLUE_500
+        self.input_background_fill = "#0a0a0a"
+        self.input_background_fill_dark = "#0a0a0a"
+        self.input_border_color = "#333333"
+        self.input_border_color_dark = "#333333"
+        self.input_border_color_focus = GREEN_500
+        self.input_border_color_focus_dark = GREEN_500
 
         # Buttons
-        self.button_primary_background_fill = BLUE_600
-        self.button_primary_background_fill_dark = BLUE_600
-        self.button_primary_background_fill_hover = BLUE_500
-        self.button_primary_background_fill_hover_dark = BLUE_500
+        self.button_primary_background_fill = "#16a34a"
+        self.button_primary_background_fill_dark = "#16a34a"
+        self.button_primary_background_fill_hover = GREEN_500
+        self.button_primary_background_fill_hover_dark = GREEN_500
         self.button_primary_text_color = "#ffffff"
         self.button_primary_text_color_dark = "#ffffff"
-        self.button_secondary_background_fill = SLATE_700
-        self.button_secondary_background_fill_dark = SLATE_700
-        self.button_secondary_text_color = SLATE_200
-        self.button_secondary_text_color_dark = SLATE_200
+        self.button_secondary_background_fill = "#1e1e1e"
+        self.button_secondary_background_fill_dark = "#1e1e1e"
+        self.button_secondary_text_color = "#d4d4d4"
+        self.button_secondary_text_color_dark = "#d4d4d4"
 
         # Borders
-        self.border_color_primary = SLATE_600
-        self.border_color_primary_dark = SLATE_600
+        self.border_color_primary = "#333333"
+        self.border_color_primary_dark = "#333333"
 
         # Shadows
         self.shadow_spread = "1px"
@@ -124,16 +124,16 @@ class WybeTheme(gr.themes.Base):
 WYBE_CSS = """
 /* ── CSS Variables ─────────────────────────────────────────── */
 :root {
-    --wybe-bg-primary: #0f172a;
-    --wybe-bg-secondary: #1e293b;
-    --wybe-bg-tertiary: #334155;
-    --wybe-bg-hover: #3b4d6b;
-    --wybe-accent: #3b82f6;
-    --wybe-accent-hover: #60a5fa;
-    --wybe-accent-dim: #1d4ed8;
-    --wybe-text: #e2e8f0;
-    --wybe-text-muted: #64748b;
-    --wybe-text-bright: #f8fafc;
+    --wybe-bg-primary: #0a0a0a;
+    --wybe-bg-secondary: #141414;
+    --wybe-bg-tertiary: #1e1e1e;
+    --wybe-bg-hover: #2a2a2a;
+    --wybe-accent: #22c55e;
+    --wybe-accent-hover: #4ade80;
+    --wybe-accent-dim: #16a34a;
+    --wybe-text: #d4d4d4;
+    --wybe-text-muted: #737373;
+    --wybe-text-bright: #fafafa;
     --wybe-success: #22c55e;
     --wybe-success-dim: #166534;
     --wybe-warning: #eab308;
@@ -142,7 +142,7 @@ WYBE_CSS = """
     --wybe-danger-dim: #991b1b;
     --wybe-purple: #a855f7;
     --wybe-cyan: #06b6d4;
-    --wybe-border: #334155;
+    --wybe-border: #262626;
     --wybe-radius: 12px;
     --wybe-radius-sm: 8px;
     --wybe-radius-xs: 4px;
@@ -180,14 +180,14 @@ footer { display: none !important; }
 .shell-bar > div:nth-child(2) { flex: 0 0 200px !important; min-width: 0 !important; }
 .shell-bar > div:nth-child(3) { flex: 0 0 auto !important; min-width: 0 !important; max-width: fit-content !important; }
 .shell-logo {
-    font-size: 18px;
+    font-size: 20px;
     font-weight: 700;
-    color: var(--wybe-accent);
+    color: var(--wybe-text-bright);
     letter-spacing: -0.5px;
     white-space: nowrap;
     font-family: var(--wybe-font);
 }
-.shell-logo span { color: var(--wybe-text-bright); }
+.shell-logo .logo-dot { color: var(--wybe-accent); }
 
 /* ── Navigation Tabs ───────────────────────────────────────── */
 .nav-tabs .tab-nav {
@@ -231,8 +231,8 @@ footer { display: none !important; }
     border-radius: 50%;
     flex-shrink: 0;
 }
-.badge-running { background: rgba(59,130,246,0.15); color: #60a5fa; }
-.badge-running .badge-dot { background: #3b82f6; animation: pulse 1.5s ease-in-out infinite; }
+.badge-running { background: rgba(34,197,94,0.15); color: #4ade80; }
+.badge-running .badge-dot { background: #22c55e; animation: pulse 1.5s ease-in-out infinite; }
 .badge-completed { background: rgba(34,197,94,0.15); color: #4ade80; }
 .badge-completed .badge-dot { background: #22c55e; }
 .badge-failed { background: rgba(239,68,68,0.15); color: #f87171; }
@@ -383,7 +383,7 @@ footer { display: none !important; }
     align-items: flex-start;
     gap: 10px;
     padding: 8px 0;
-    border-bottom: 1px solid rgba(51,65,85,0.5);
+    border-bottom: 1px solid rgba(38,38,38,0.5);
 }
 .activity-item:last-child { border-bottom: none; }
 .activity-icon {

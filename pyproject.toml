@@ -49,6 +49,7 @@ dev = [
 frontend = [
     "gradio>=5.0.0",
     "plotly",
+    "anthropic>=0.40.0",
 ]
 tensorrt = [
     "onnx>=1.20.0",

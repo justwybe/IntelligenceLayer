@@ -77,7 +77,7 @@ def create_app() -> gr.Blocks:
 
         # ── Shell bar ──
         with gr.Row(elem_classes="shell-bar"):
-            gr.HTML('<span class="shell-logo"><span>Wybe</span> Studio</span>')
+            gr.HTML('<span class="shell-logo">wybe<span class="logo-dot">.</span></span>')
 
             project_dropdown = gr.Dropdown(
                 label="Project",
