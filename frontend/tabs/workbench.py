@@ -50,18 +50,19 @@ def _system_info() -> str:
 
 
 def _server_badge(sm: ServerManager) -> str:
-    running = sm.ping()
-    if running:
+    proc_status = sm.status()
+    if proc_status != "running":
+        return "### Server Stopped"
+    # Only ping if the process is actually running
+    alive = sm.ping()
+    if alive:
         info = (
             f"**Model**: `{sm.current_model_path or 'unknown'}`\n\n"
             f"**Embodiment**: `{sm.current_embodiment_tag or 'unknown'}`\n\n"
             f"**Port**: `{sm.current_port}`"
         )
         return f"### Server Running\n\n{info}"
-    proc_status = sm.status()
-    if proc_status == "running":
-        return "### Server Starting..."
-    return "### Server Stopped"
+    return "### Server Starting..."
 
 
 def _format_activity(store: WorkspaceStore, project_id: str | None) -> str:
@@ -93,7 +94,7 @@ def create_workbench_tab(
                     value=format_gpu_markdown(get_gpu_info()),
                 )
                 server_status = gr.Markdown(
-                    value=_server_badge(server_manager),
+                    value="### Server Stopped",
                 )
 
                 gr.Markdown("---")
