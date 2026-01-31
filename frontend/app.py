@@ -48,19 +48,18 @@ def create_app() -> gr.Blocks:
     # Clean up stale runs on startup
     task_runner.reconnect_on_startup()
 
-    with gr.Blocks(
-        title="Wybe Studio",
-        theme=gr.themes.Soft(),
-        css="""
-        .gradio-container { max-width: 1400px; margin: auto; }
-        footer { display: none !important; }
-        .project-bar { margin-bottom: 1rem; }
-        """,
-    ) as app:
+    _theme = gr.themes.Soft()
+    _css = """
+    .gradio-container { max-width: 1400px; margin: auto; }
+    footer { display: none !important; }
+    .project-bar { margin-bottom: 1rem; }
+    """
+
+    with gr.Blocks(title="Wybe Studio") as app:
 
         # ── Project selector bar ──
         with gr.Row(elem_classes="project-bar"):
-            gr.Markdown("# Wybe Studio", scale=3)
+            gr.Markdown("# Wybe Studio")
             project_dropdown = gr.Dropdown(
                 label="Project",
                 choices=_project_choices(store),
@@ -141,6 +140,8 @@ def create_app() -> gr.Blocks:
             outputs=[project_dropdown, create_proj_status, project_state],
         )
 
+    app._theme = _theme
+    app._custom_css = _css
     return app
 
 
@@ -152,12 +153,19 @@ def _project_choices(store: WorkspaceStore) -> list[str]:
 def main():
     app = create_app()
     app.queue()
-    app.launch(
-        server_name="0.0.0.0",
-        server_port=int(os.environ.get("GRADIO_PORT", 7860)),
-        share=False,
-        show_error=True,
-    )
+    theme = getattr(app, "_theme", None)
+    css = getattr(app, "_custom_css", None)
+    launch_kwargs = {
+        "server_name": "0.0.0.0",
+        "server_port": int(os.environ.get("GRADIO_PORT", 7860)),
+        "share": True,
+        "show_error": True,
+    }
+    if theme:
+        launch_kwargs["theme"] = theme
+    if css:
+        launch_kwargs["css"] = css
+    app.launch(**launch_kwargs)
 
 
 if __name__ == "__main__":
