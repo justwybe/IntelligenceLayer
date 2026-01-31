@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+import sys
 import traceback
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any, Callable
 
 logger = logging.getLogger(__name__)
@@ -80,7 +83,7 @@ class ToolRegistry:
             return ToolResult(output=f"Unknown tool: {name}", is_error=True)
 
         try:
-            return tool.handler(context, args)
+            result = tool.handler(context, args)
         except Exception as exc:
             logger.exception("Tool %s failed", name)
             return ToolResult(
@@ -88,9 +91,24 @@ class ToolRegistry:
                 is_error=True,
             )
 
+        # Truncate oversized tool output to prevent sending huge payloads to LLM API
+        max_output = 50_000
+        if len(result.output) > max_output:
+            result = ToolResult(
+                output=result.output[:max_output] + "\n[truncated]",
+                is_error=result.is_error,
+            )
+        return result
+
 
 def json_output(data: Any) -> str:
     """Format data as a readable JSON string for tool output."""
     if isinstance(data, str):
         return data
     return json.dumps(data, indent=2, default=str)
+
+
+def get_venv_python(project_root: str) -> str:
+    """Return the venv Python path if it exists, otherwise fall back to sys.executable."""
+    venv = os.path.join(project_root, ".venv", "bin", "python")
+    return venv if os.path.exists(venv) else sys.executable

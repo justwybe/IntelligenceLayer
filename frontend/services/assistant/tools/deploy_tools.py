@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 
 from frontend.constants import EMBODIMENT_CHOICES
-from frontend.services.assistant.tools.base import ToolContext, ToolDef, ToolResult, json_output
+from frontend.services.assistant.tools.base import ToolContext, ToolDef, ToolResult, get_venv_python, json_output
 
 
 def _register_model(ctx: ToolContext, args: dict) -> ToolResult:
@@ -72,7 +72,7 @@ def _export_onnx(ctx: ToolContext, args: dict) -> ToolResult:
     }
     run_id = ctx.store.create_run(project_id=pid, run_type="onnx_export", config=config)
 
-    venv_python = str(Path(ctx.project_root) / ".venv" / "bin" / "python")
+    venv_python = get_venv_python(ctx.project_root)
     cmd = [
         venv_python, "scripts/deployment/export_onnx_n1d6.py",
         "--model_path", model_path,
@@ -100,7 +100,7 @@ def _build_tensorrt(ctx: ToolContext, args: dict) -> ToolResult:
     config = {"onnx_path": onnx_path, "engine_path": engine_path, "precision": precision}
     run_id = ctx.store.create_run(project_id=pid, run_type="tensorrt_build", config=config)
 
-    venv_python = str(Path(ctx.project_root) / ".venv" / "bin" / "python")
+    venv_python = get_venv_python(ctx.project_root)
     cmd = [
         venv_python, "scripts/deployment/build_tensorrt_engine.py",
         "--onnx", onnx_path,
@@ -127,7 +127,7 @@ def _run_benchmark(ctx: ToolContext, args: dict) -> ToolResult:
     config = {"model_path": model_path, "embodiment_tag": embodiment, "num_iterations": num_iters}
     run_id = ctx.store.create_run(project_id=pid, run_type="benchmark", config=config)
 
-    venv_python = str(Path(ctx.project_root) / ".venv" / "bin" / "python")
+    venv_python = get_venv_python(ctx.project_root)
     cmd = [
         venv_python, "scripts/deployment/benchmark_inference.py",
         "--model_path", model_path,

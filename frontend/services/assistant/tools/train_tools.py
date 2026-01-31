@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 
 from frontend.constants import EMBODIMENT_CHOICES, TRAINING_PRESETS
-from frontend.services.assistant.tools.base import ToolContext, ToolDef, ToolResult, json_output
+from frontend.services.assistant.tools.base import ToolContext, ToolDef, ToolResult, get_venv_python, json_output
 
 
 def _launch_training(ctx: ToolContext, args: dict) -> ToolResult:
@@ -36,6 +36,14 @@ def _launch_training(ctx: ToolContext, args: dict) -> ToolResult:
     save_steps = int(args.get("save_steps", defaults["save_steps"]))
     output_dir = args.get("output_dir", "./outputs")
 
+    # Validate hyperparameters
+    if not (1e-8 <= float(lr) <= 1.0):
+        return ToolResult(output="learning_rate must be between 1e-8 and 1.0.", is_error=True)
+    if not (1 <= max_steps <= 10_000_000):
+        return ToolResult(output="max_steps must be between 1 and 10,000,000.", is_error=True)
+    if not (1 <= batch_size <= 4096):
+        return ToolResult(output="global_batch_size must be between 1 and 4096.", is_error=True)
+
     config = {
         "base_model": base_model,
         "dataset_path": dataset_path,
@@ -51,7 +59,7 @@ def _launch_training(ctx: ToolContext, args: dict) -> ToolResult:
 
     run_id = ctx.store.create_run(project_id=pid, run_type="training", config=config)
 
-    venv_python = str(Path(ctx.project_root) / ".venv" / "bin" / "python")
+    venv_python = get_venv_python(ctx.project_root)
     cmd = [
         venv_python, "-m", "gr00t.experiment.launch_finetune",
         "--base_model_path", base_model,

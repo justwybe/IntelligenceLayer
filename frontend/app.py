@@ -25,6 +25,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 from frontend.constants import EMBODIMENT_CHOICES
+from frontend.services.path_utils import init_allowed_roots
 from frontend.pages.assistant_panel import create_assistant_panel
 from frontend.pages.dashboard import create_dashboard_sidebar
 from frontend.pages.datasets import create_datasets_page
@@ -51,6 +52,9 @@ def _project_choices(store: WorkspaceStore) -> list[str]:
 
 def create_app() -> gr.Blocks:
     """Build the full Wybe Studio application."""
+
+    # ── Path validation ──
+    init_allowed_roots(PROJECT_ROOT)
 
     # ── Core services ──
     store = WorkspaceStore()

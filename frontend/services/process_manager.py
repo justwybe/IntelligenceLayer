@@ -26,9 +26,14 @@ class ProcessInfo:
 class ProcessManager:
     """Thread-safe manager for launching and tracking subprocesses."""
 
-    def __init__(self, log_dir: str = "/tmp/intelligenceLayer_logs"):
+    def __init__(self, log_dir: str | None = None):
         self._processes: dict[str, ProcessInfo] = {}
         self._lock = threading.Lock()
+        if log_dir is None:
+            base = os.environ.get(
+                "WYBE_DATA_DIR", os.path.expanduser("~/.wybe_studio")
+            )
+            log_dir = os.path.join(base, "process_logs")
         self._log_dir = Path(log_dir)
         self._log_dir.mkdir(parents=True, exist_ok=True)
 
@@ -39,7 +44,7 @@ class ProcessManager:
             if info.log_file and not getattr(info.log_file, "closed", True):
                 info.log_file.close()
         except Exception:
-            pass
+            logger.debug("Failed to close log file for %s", info.task_type, exc_info=True)
 
     def launch(
         self,
@@ -172,7 +177,7 @@ class ProcessManager:
             if info.log_file and not getattr(info.log_file, "closed", True):
                 info.log_file.flush()
         except Exception:
-            pass
+            logger.debug("Failed to flush log file for %s", task_type, exc_info=True)
         try:
             text = info.log_path.read_text(errors="replace")
             lines = text.splitlines()

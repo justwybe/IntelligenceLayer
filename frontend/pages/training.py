@@ -3,14 +3,18 @@
 from __future__ import annotations
 
 import json
+import logging
 import re
 from pathlib import Path
 
 import gradio as gr
 
+logger = logging.getLogger(__name__)
+
 from frontend.components.progress_bar import render_progress_bar
 from frontend.components.status_badge import render_status_badge
 from frontend.constants import EMBODIMENT_CHOICES, TRAINING_PRESETS, ISAAC_LAB_ENVS, RL_ALGORITHMS
+from frontend.services.assistant.tools.base import get_venv_python
 from frontend.services.task_runner import TaskRunner
 from frontend.services.workspace import WorkspaceStore
 
@@ -27,13 +31,13 @@ def _run_history_table(store: WorkspaceStore, project_id: str | None) -> list[li
         try:
             config = json.loads(r["config"]) if isinstance(r["config"], str) else r["config"]
         except Exception:
-            pass
+            logger.debug("Failed to parse run config for %s", r.get("id"), exc_info=True)
         metrics = {}
         try:
             if r.get("metrics"):
                 metrics = json.loads(r["metrics"]) if isinstance(r["metrics"], str) else r["metrics"]
         except Exception:
-            pass
+            logger.debug("Failed to parse run metrics for %s", r.get("id"), exc_info=True)
         loss = metrics.get("loss", "-")
         step = metrics.get("step", "-")
         dataset = config.get("dataset_path", config.get("environment", "-"))
@@ -316,7 +320,7 @@ def create_training_page(
         if resume_ckpt_path:
             config["resume_checkpoint_path"] = resume_ckpt_path
 
-        venv_python = str(Path(project_root) / ".venv" / "bin" / "python")
+        venv_python = get_venv_python(project_root)
         cmd = [
             venv_python, "-m", "gr00t.experiment.launch_finetune",
             "--base_model_path", base_model, "--dataset_path", dataset,
@@ -483,7 +487,7 @@ def create_training_page(
                 config = json.loads(run["config"]) if isinstance(run["config"], str) else run["config"]
                 max_steps = config.get("max_steps", 10000)
             except Exception:
-                pass
+                logger.debug("Failed to parse config for run %s", run_id, exc_info=True)
         pct = (current_step / max_steps * 100) if max_steps > 0 else 0
         status = task_runner.status(run_id)
         return render_progress_bar(pct, status, f"{current_step:,} / {max_steps:,} steps")
@@ -527,17 +531,7 @@ def create_training_page(
         pid = proj.get("id") if proj else None
         if not pid:
             return "Error: select a project first", ""
-        config = {
-            "environment": env,
-            "algorithm": algorithm,
-            "num_envs": int(num_envs),
-            "total_timesteps": int(total_timesteps),
-            "domain_randomization": domain_rand,
-            "remote_host": remote_host,
-            "remote_port": int(remote_port),
-        }
-        run_id = store.create_run(project_id=pid, run_type="rl_training", config=config)
-        return f"Isaac Lab RL training queued: {env} with {algorithm} ({int(num_envs)} envs, {int(total_timesteps)} timesteps). Run ID: {run_id}", run_id
+        return "Isaac Lab RL training is not yet available — backend integration pending.", ""
 
     def stop_rl_training(run_id):
         return task_runner.stop(run_id) if run_id else "No active RL training run"

@@ -4,14 +4,18 @@ from __future__ import annotations
 
 import glob as glob_mod
 import json
+import logging
 import os
 import re
 from pathlib import Path
 
 import gradio as gr
 
+logger = logging.getLogger(__name__)
+
 from frontend.components.status_badge import render_status_badge
 from frontend.constants import EMBODIMENT_CHOICES, SIM_TASKS
+from frontend.services.assistant.tools.base import get_venv_python
 from frontend.services.task_runner import TaskRunner
 from frontend.services.workspace import WorkspaceStore
 
@@ -33,7 +37,7 @@ def _eval_history_table(store: WorkspaceStore, project_id: str | None) -> list[l
             if r.get("metrics"):
                 metrics = json.loads(r["metrics"]) if isinstance(r["metrics"], str) else r["metrics"]
         except Exception:
-            pass
+            logger.debug("Failed to parse eval run metrics", exc_info=True)
         metrics_str = ", ".join(f"{k}={v}" for k, v in list(metrics.items())[:3]) if metrics else "-"
         rows.append([r["id"][:8], r["run_type"], r["status"], metrics_str, r.get("started_at", "")[:16] if r.get("started_at") else ""])
     return rows
@@ -101,7 +105,7 @@ def create_simulation_page(
                         model_path = model_path.split("|")[-1].strip()
                     config = {"env_name": env_name, "task": task, "model_path": model_path, "use_server": use_server, "max_steps": int(max_steps), "n_action_steps": int(n_action_steps), "n_episodes": int(n_episodes), "n_envs": int(n_envs)}
                     run_id = store.create_run(project_id=pid, run_type="simulation", config=config)
-                    venv_python = str(Path(project_root) / ".venv" / "bin" / "python")
+                    venv_python = get_venv_python(project_root)
                     cmd = [venv_python, "-m", "gr00t.eval.rollout_policy", "--env_name", task, "--max_episode_steps", str(int(max_steps)), "--n_action_steps", str(int(n_action_steps)), "--n_episodes", str(int(n_episodes)), "--n_envs", str(int(n_envs))]
                     if use_server:
                         cmd.extend(["--policy_client_host", server_host, "--policy_client_port", str(int(server_port))])
@@ -186,7 +190,7 @@ def create_simulation_page(
                     run_id = store.create_run(project_id=pid, run_type="evaluation", config=config)
                     save_dir = os.path.join(_eval_base, run_id)
                     os.makedirs(save_dir, exist_ok=True)
-                    venv_python = str(Path(project_root) / ".venv" / "bin" / "python")
+                    venv_python = get_venv_python(project_root)
                     cmd = [
                         venv_python, "-m", "gr00t.eval.open_loop_eval",
                         "--dataset_path", dataset_path, "--embodiment_tag", embodiment,
@@ -285,7 +289,7 @@ def create_simulation_page(
                                     margin=dict(l=40, r=20, t=40, b=40),
                                 )
                         except Exception:
-                            pass
+                            logger.debug("Failed to create comparison chart", exc_info=True)
                     return rows, fig
 
                 compare_btn.click(load_comparison, inputs=[project_state], outputs=[compare_table, compare_plot])

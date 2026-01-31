@@ -107,7 +107,7 @@ class TaskRunner:
             if info.log_file and not getattr(info.log_file, "closed", True):
                 info.log_file.close()
         except Exception:
-            pass
+            logger.debug("Failed to close log file for run %s", info.run_id, exc_info=True)
 
     def _wait_for_exit(self, run_id: str) -> None:
         with self._lock:
@@ -234,7 +234,7 @@ class TaskRunner:
                 if info.log_file and not getattr(info.log_file, "closed", True):
                     info.log_file.flush()
             except Exception:
-                pass
+                logger.debug("Failed to flush log file for run %s", run_id, exc_info=True)
             log_path = info.log_path
         else:
             # Fall back to DB-stored path

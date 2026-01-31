@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
 
 import gradio as gr
 
+logger = logging.getLogger(__name__)
+
 from frontend.constants import EMBODIMENT_CHOICES
+from frontend.services.assistant.tools.base import get_venv_python
 from frontend.services.server_manager import ServerManager
 from frontend.services.task_runner import TaskRunner
 from frontend.services.workspace import WorkspaceStore
@@ -27,7 +31,7 @@ def _models_table(store: WorkspaceStore, project_id: str | None) -> list[list]:
                     metrics = json.loads(ev["metrics"]) if isinstance(ev["metrics"], str) else ev["metrics"]
                     eval_summary += ", ".join(f"{k}={v}" for k, v in metrics.items())
                 except Exception:
-                    pass
+                    logger.debug("Failed to parse eval metrics", exc_info=True)
         rows.append([m["name"], m["path"], str(m.get("step", "")), m.get("embodiment_tag", ""), eval_summary or "-"])
     return rows
 
@@ -74,7 +78,7 @@ def _benchmark_history_table(store: WorkspaceStore, project_id: str | None) -> l
                 metrics = json.loads(r["metrics"]) if isinstance(r["metrics"], str) else r["metrics"]
             config = json.loads(r["config"]) if isinstance(r["config"], str) else r["config"]
         except Exception:
-            pass
+            logger.debug("Failed to parse benchmark run data", exc_info=True)
         model = config.get("model_path", "-")
         if len(model) > 30:
             model = "..." + model[-27:]
@@ -228,7 +232,7 @@ def create_models_page(
     def generate_command(model_path):
         if not model_path.strip():
             return ""
-        venv_python = str(Path(project_root) / ".venv" / "bin" / "python")
+        venv_python = get_venv_python(project_root)
         return f"{venv_python} -m gr00t.eval.run_gr00t_server --model_path {model_path} --embodiment_tag new_embodiment --port 5555 --device cuda --host 0.0.0.0"
 
     def launch_onnx_export(model_path, dataset_path, embodiment, output_dir, proj):
@@ -239,7 +243,7 @@ def create_models_page(
             return "Select a project first", "", ""
         config = {"model_path": model_path, "dataset_path": dataset_path, "embodiment_tag": embodiment, "output_dir": output_dir}
         run_id = store.create_run(project_id=pid, run_type="onnx_export", config=config)
-        venv_python = str(Path(project_root) / ".venv" / "bin" / "python")
+        venv_python = get_venv_python(project_root)
         cmd = [venv_python, "scripts/deployment/export_onnx_n1d6.py", "--model_path", model_path, "--dataset_path", dataset_path, "--embodiment_tag", embodiment, "--output_dir", output_dir]
         msg = task_runner.launch(run_id, cmd, cwd=project_root)
         return msg, run_id, ""
@@ -260,7 +264,7 @@ def create_models_page(
                     onnx_path_update = gr.update(value=expected_onnx)
                     status_msg += f" — ONNX exported to {expected_onnx}"
                 except Exception:
-                    pass
+                    logger.debug("Failed to parse ONNX export config", exc_info=True)
         return status_msg, log, onnx_path_update
 
     def launch_trt(onnx_path, precision, proj):
@@ -272,7 +276,7 @@ def create_models_page(
         engine_path = onnx_path.replace(".onnx", f".{precision}.trt")
         config = {"onnx_path": onnx_path, "engine_path": engine_path, "precision": precision}
         run_id = store.create_run(project_id=pid, run_type="tensorrt_build", config=config)
-        venv_python = str(Path(project_root) / ".venv" / "bin" / "python")
+        venv_python = get_venv_python(project_root)
         cmd = [venv_python, "scripts/deployment/build_tensorrt_engine.py", "--onnx", onnx_path, "--engine", engine_path, "--precision", precision]
         msg = task_runner.launch(run_id, cmd, cwd=project_root)
         return msg, run_id, ""
@@ -293,7 +297,7 @@ def create_models_page(
                     trt_path_update = gr.update(value=engine_path)
                     status_msg += f" — Engine built: {engine_path}"
                 except Exception:
-                    pass
+                    logger.debug("Failed to parse TensorRT build config", exc_info=True)
         return status_msg, log, trt_path_update
 
     def launch_benchmark(model_path, trt_path, embodiment, num_iters, skip_compile, proj):
@@ -304,7 +308,7 @@ def create_models_page(
             return "Select a project first", "", [], None
         config = {"model_path": model_path, "embodiment_tag": embodiment, "num_iterations": int(num_iters), "trt_engine_path": trt_path if trt_path.strip() else None, "skip_compile": skip_compile}
         run_id = store.create_run(project_id=pid, run_type="benchmark", config=config)
-        venv_python = str(Path(project_root) / ".venv" / "bin" / "python")
+        venv_python = get_venv_python(project_root)
         cmd = [venv_python, "scripts/deployment/benchmark_inference.py", "--model_path", model_path, "--embodiment_tag", embodiment, "--num_iterations", str(int(num_iters))]
         if trt_path.strip():
             cmd.extend(["--trt_engine_path", trt_path])
@@ -338,7 +342,7 @@ def create_models_page(
                 chart.add_trace(go.Bar(x=modes, y=e2e_vals, marker_color=["#3b82f6", "#eab308", "#22c55e", "#ef4444"][:len(modes)]))
                 chart.update_layout(title="Inference Timing", yaxis_title="E2E Latency (ms)", template="plotly_dark", height=350, margin=dict(l=40, r=20, t=40, b=40))
             except Exception:
-                pass
+                logger.debug("Failed to create benchmark chart", exc_info=True)
 
             if status == "completed" and results:
                 existing_evals = store.list_evaluations(run_id=run_id)
@@ -366,7 +370,7 @@ def create_models_page(
                     metrics = json.loads(r["metrics"]) if isinstance(r["metrics"], str) else r["metrics"]
                 config = json.loads(r["config"]) if isinstance(r["config"], str) else r["config"]
             except Exception:
-                pass
+                logger.debug("Failed to parse benchmark history data", exc_info=True)
             freq = metrics.get("frequency_hz", "")
             model = config.get("model_path", "unknown")
             if len(model) > 20:
@@ -384,7 +388,7 @@ def create_models_page(
                 chart.add_trace(go.Bar(x=list(labels), y=list(values), marker_color="#3b82f6"))
                 chart.update_layout(title="Benchmark Frequency Comparison", yaxis_title="Frequency (Hz)", template="plotly_dark", height=350, margin=dict(l=40, r=20, t=40, b=40))
             except Exception:
-                pass
+                logger.debug("Failed to create benchmark history chart", exc_info=True)
         return table, chart
 
     # Wire callbacks

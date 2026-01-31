@@ -5,7 +5,8 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from frontend.services.assistant.tools.base import ToolContext, ToolDef, ToolResult, json_output
+from frontend.services.assistant.tools.base import ToolContext, ToolDef, ToolResult, get_venv_python, json_output
+from frontend.services.path_utils import validate_path
 
 
 def _import_dataset(ctx: ToolContext, args: dict) -> ToolResult:
@@ -18,9 +19,11 @@ def _import_dataset(ctx: ToolContext, args: dict) -> ToolResult:
     if not name or not path:
         return ToolResult(output="Both name and path are required.", is_error=True)
 
+    err = validate_path(path, must_exist=True)
+    if err:
+        return ToolResult(output=err, is_error=True)
+
     p = Path(path)
-    if not p.exists():
-        return ToolResult(output=f"Path does not exist: {path}", is_error=True)
 
     # Count episodes
     episodes_file = p / "meta" / "episodes.jsonl"
@@ -43,9 +46,10 @@ def _inspect_dataset(ctx: ToolContext, args: dict) -> ToolResult:
     path = args.get("path", "").strip()
     if not path:
         return ToolResult(output="Dataset path is required.", is_error=True)
+    err = validate_path(path, must_exist=True)
+    if err:
+        return ToolResult(output=err, is_error=True)
     p = Path(path)
-    if not p.exists():
-        return ToolResult(output=f"Path not found: {path}", is_error=True)
 
     result = {}
 
@@ -101,7 +105,7 @@ def _compute_statistics(ctx: ToolContext, args: dict) -> ToolResult:
     config = {"dataset_path": dataset_path, "embodiment_tag": embodiment_tag}
     run_id = ctx.store.create_run(project_id=pid, run_type="stats_computation", config=config)
 
-    venv_python = str(Path(ctx.project_root) / ".venv" / "bin" / "python")
+    venv_python = get_venv_python(ctx.project_root)
     cmd = [
         venv_python, "-m", "gr00t.data.stats",
         "--dataset-path", dataset_path,
@@ -123,7 +127,7 @@ def _convert_dataset_v3_to_v2(ctx: ToolContext, args: dict) -> ToolResult:
     config = {"repo_id": repo_id, "output_dir": output_dir}
     run_id = ctx.store.create_run(project_id=pid, run_type="conversion", config=config)
 
-    venv_python = str(Path(ctx.project_root) / ".venv" / "bin" / "python")
+    venv_python = get_venv_python(ctx.project_root)
     cmd = [
         venv_python, "scripts/lerobot_conversion/convert_v3_to_v2.py",
         "--repo-id", repo_id,
@@ -135,13 +139,20 @@ def _convert_dataset_v3_to_v2(ctx: ToolContext, args: dict) -> ToolResult:
 
 def _browse_episode(ctx: ToolContext, args: dict) -> ToolResult:
     dataset_path = args.get("dataset_path", "").strip()
-    episode_index = int(args.get("episode_index", 0))
+    try:
+        episode_index = int(args.get("episode_index", 0))
+    except (ValueError, TypeError):
+        return ToolResult(output="episode_index must be a valid integer.", is_error=True)
+    if episode_index < 0:
+        return ToolResult(output="episode_index must be non-negative.", is_error=True)
     if not dataset_path:
         return ToolResult(output="dataset_path is required.", is_error=True)
 
+    err = validate_path(dataset_path, must_exist=True)
+    if err:
+        return ToolResult(output=err, is_error=True)
+
     p = Path(dataset_path)
-    if not p.exists():
-        return ToolResult(output=f"Path not found: {dataset_path}", is_error=True)
 
     ep_str = f"episode_{episode_index:06d}"
     parquet_path = p / "data" / "chunk-000" / f"{ep_str}.parquet"
@@ -154,6 +165,14 @@ def _browse_episode(ctx: ToolContext, args: dict) -> ToolResult:
                 break
         else:
             return ToolResult(output=f"Episode {episode_index} not found.", is_error=True)
+
+    # Reject oversized parquet files
+    _max_parquet_bytes = 500 * 1024 * 1024  # 500 MB
+    if parquet_path.stat().st_size > _max_parquet_bytes:
+        return ToolResult(
+            output=f"Parquet file too large ({parquet_path.stat().st_size / 1e6:.0f} MB, limit 500 MB)",
+            is_error=True,
+        )
 
     try:
         import pandas as pd

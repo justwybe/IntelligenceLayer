@@ -8,7 +8,7 @@ import re
 from pathlib import Path
 
 from frontend.constants import EMBODIMENT_CHOICES, SIM_TASKS
-from frontend.services.assistant.tools.base import ToolContext, ToolDef, ToolResult, json_output
+from frontend.services.assistant.tools.base import ToolContext, ToolDef, ToolResult, get_venv_python, json_output
 
 
 def _run_open_loop_eval(ctx: ToolContext, args: dict) -> ToolResult:
@@ -39,7 +39,7 @@ def _run_open_loop_eval(ctx: ToolContext, args: dict) -> ToolResult:
     save_dir = os.path.join(eval_base, run_id)
     os.makedirs(save_dir, exist_ok=True)
 
-    venv_python = str(Path(ctx.project_root) / ".venv" / "bin" / "python")
+    venv_python = get_venv_python(ctx.project_root)
     cmd = [
         venv_python, "-m", "gr00t.eval.open_loop_eval",
         "--dataset_path", dataset_path,
@@ -78,7 +78,7 @@ def _launch_simulation(ctx: ToolContext, args: dict) -> ToolResult:
     config = {"task": task, "model_path": model_path, "n_episodes": n_episodes}
     run_id = ctx.store.create_run(project_id=pid, run_type="simulation", config=config)
 
-    venv_python = str(Path(ctx.project_root) / ".venv" / "bin" / "python")
+    venv_python = get_venv_python(ctx.project_root)
     cmd = [
         venv_python, "-m", "gr00t.eval.rollout_policy",
         "--env_name", task,

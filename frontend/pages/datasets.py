@@ -3,19 +3,20 @@
 from __future__ import annotations
 
 import json
-import shutil
+import logging
 import traceback
 from pathlib import Path
 
 import gradio as gr
 
+logger = logging.getLogger(__name__)
+
 from frontend.components.dataset_card import render_dataset_cards
 from frontend.constants import EMBODIMENT_CHOICES, MIMIC_ENVS
+from frontend.services.assistant.tools.base import get_venv_python
+from frontend.services.path_utils import validate_path
 from frontend.services.task_runner import TaskRunner
 from frontend.services.workspace import WorkspaceStore
-
-# Track temp directory for episode viewer plots
-_episode_tmpdir: str | None = None
 
 
 def _count_episodes(dataset_path: str) -> int | None:
@@ -37,13 +38,7 @@ def _dataset_dropdown_choices(store: WorkspaceStore, project_id: str | None) -> 
 
 def _load_episode_plots(dataset_path: str, episode_index: int) -> dict:
     """Load episode data and create Plotly figures."""
-    global _episode_tmpdir
-
     result = {"video_path": None, "state_fig": None, "action_fig": None, "task_desc": "", "error": None}
-
-    if _episode_tmpdir is not None:
-        shutil.rmtree(_episode_tmpdir, ignore_errors=True)
-        _episode_tmpdir = None
 
     p = Path(dataset_path)
     if not p.exists():
@@ -61,6 +56,12 @@ def _load_episode_plots(dataset_path: str, episode_index: int) -> dict:
         else:
             result["error"] = f"Parquet file not found for episode {episode_index}"
             return result
+
+    # Reject oversized parquet files
+    _max_parquet_bytes = 500 * 1024 * 1024  # 500 MB
+    if parquet_path.stat().st_size > _max_parquet_bytes:
+        result["error"] = f"Parquet file too large ({parquet_path.stat().st_size / 1e6:.0f} MB, limit 500 MB)"
+        return result
 
     try:
         import pandas as pd
@@ -103,7 +104,7 @@ def _load_episode_plots(dataset_path: str, episode_index: int) -> dict:
             )
             result["state_fig"] = fig
         except Exception:
-            pass
+            logger.debug("Failed to plot state trajectories", exc_info=True)
 
     # Plot action trajectories with Plotly
     action_cols = [c for c in df.columns if c.startswith("action")]
@@ -132,7 +133,7 @@ def _load_episode_plots(dataset_path: str, episode_index: int) -> dict:
             )
             result["action_fig"] = fig
         except Exception:
-            pass
+            logger.debug("Failed to plot action trajectories", exc_info=True)
 
     # Task description
     tasks_file = p / "meta" / "tasks.jsonl"
@@ -147,7 +148,7 @@ def _load_episode_plots(dataset_path: str, episode_index: int) -> dict:
             elif tasks:
                 result["task_desc"] = tasks[0].get("task", str(tasks[0]))
         except Exception:
-            pass
+            logger.debug("Failed to read task description", exc_info=True)
 
     return result
 
@@ -308,6 +309,9 @@ def create_datasets_page(
     def import_dataset(name, path, source, proj):
         if not name.strip() or not path.strip():
             return "Name and path are required"
+        err = validate_path(path, must_exist=True)
+        if err:
+            return err
         pid = proj.get("id") if proj else None
         if not pid:
             return "Select a project first"
@@ -325,6 +329,9 @@ def create_datasets_page(
     def import_urban_memory(name, path, proj):
         if not name.strip() or not path.strip():
             return "Name and path are required"
+        err = validate_path(path, must_exist=True)
+        if err:
+            return err
         pid = proj.get("id") if proj else None
         if not pid:
             return "Select a project first"
@@ -345,14 +352,15 @@ def create_datasets_page(
         pid = proj.get("id") if proj else None
         if not pid:
             return "Select a project first"
-        return f"GR00T-Mimic generation queued: env={env}, demos={int(num_demos)}, output={output_dir}"
+        return "GR00T-Mimic data generation is not yet available — backend script not implemented."
 
     def inspect_dataset(path):
         if not path.strip():
             return "", "", "", ""
+        err = validate_path(path, must_exist=True)
+        if err:
+            return err, "", "", ""
         p = Path(path)
-        if not p.exists():
-            return f"Path not found: {path}", "", "", ""
 
         info_str = modality_str = tasks_str = stats_str = ""
 
@@ -407,7 +415,7 @@ def create_datasets_page(
             return "Select a project first", ""
         config = {"dataset_path": dataset_path, "embodiment_tag": embodiment}
         run_id = store.create_run(project_id=pid, run_type="stats_computation", config=config)
-        venv_python = str(Path(project_root) / ".venv" / "bin" / "python")
+        venv_python = get_venv_python(project_root)
         cmd = [venv_python, "-m", "gr00t.data.stats", "--dataset-path", dataset_path, "--embodiment-tag", embodiment]
         msg = task_runner.launch(run_id, cmd, cwd=project_root)
         return msg, run_id
@@ -430,7 +438,7 @@ def create_datasets_page(
             return "Select a project first", ""
         config = {"repo_id": repo_id, "output_dir": output_dir}
         run_id = store.create_run(project_id=pid, run_type="conversion", config=config)
-        venv_python = str(Path(project_root) / ".venv" / "bin" / "python")
+        venv_python = get_venv_python(project_root)
         cmd = [venv_python, "scripts/lerobot_conversion/convert_v3_to_v2.py", "--repo-id", repo_id, "--root", output_dir]
         msg = task_runner.launch(run_id, cmd, cwd=project_root)
         return msg, run_id
@@ -457,13 +465,22 @@ def create_datasets_page(
                             store.register_dataset(project_id=pid, name=ds_name, path=output_dir, source="imported", episode_count=ep_count)
                             status_msg += " — dataset auto-registered"
                 except Exception:
-                    pass
+                    logger.debug("Failed to auto-register converted dataset", exc_info=True)
         return status_msg, log
 
     def load_episode(dataset_path, episode_index):
         if not dataset_path.strip():
             return None, None, None, "Provide a dataset path"
-        data = _load_episode_plots(dataset_path, int(episode_index))
+        err = validate_path(dataset_path, must_exist=True)
+        if err:
+            return None, None, None, f"**Error:** {err}"
+        try:
+            episode_index = int(episode_index)
+        except (ValueError, TypeError):
+            return None, None, None, "**Error:** Episode index must be a valid integer"
+        if episode_index < 0:
+            return None, None, None, "**Error:** Episode index must be non-negative"
+        data = _load_episode_plots(dataset_path, episode_index)
         if data["error"]:
             return None, None, None, f"**Error:** {data['error']}"
         task = data["task_desc"]

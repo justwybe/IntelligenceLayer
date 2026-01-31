@@ -5,6 +5,7 @@ from pathlib import Path
 import sys
 import threading
 
+from frontend.services.assistant.tools.base import get_venv_python
 from frontend.services.process_manager import ProcessManager
 
 
@@ -46,7 +47,7 @@ class ServerManager:
         if not model_path:
             return "Error: model_path is required"
 
-        venv_python = str(Path(self.project_root) / ".venv" / "bin" / "python")
+        venv_python = get_venv_python(self.project_root)
         cmd = [
             venv_python,
             "-m",
@@ -79,7 +80,7 @@ class ServerManager:
             )
             client.kill_server()
         except Exception:
-            pass
+            logger.debug("Failed to gracefully kill server via PolicyClient", exc_info=True)
 
         result = self._pm.stop(self.TASK_TYPE)
         if "stopped" in result or "exited" in result:
@@ -96,6 +97,7 @@ class ServerManager:
             )
             return client.ping()
         except Exception:
+            logger.debug("Server ping failed", exc_info=True)
             return False
 
     def status(self) -> str:
