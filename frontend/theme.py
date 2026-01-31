@@ -66,36 +66,36 @@ class WybeTheme(gr.themes.Base):
         )
 
         # Background layers
-        self.body_background_fill = "#0a0a0a"
-        self.body_background_fill_dark = "#050505"
-        self.background_fill_primary = "#141414"
-        self.background_fill_primary_dark = "#0a0a0a"
-        self.background_fill_secondary = "#1e1e1e"
-        self.background_fill_secondary_dark = "#141414"
+        self.body_background_fill = SLATE_900
+        self.body_background_fill_dark = SLATE_950
+        self.background_fill_primary = SLATE_800
+        self.background_fill_primary_dark = SLATE_900
+        self.background_fill_secondary = SLATE_700
+        self.background_fill_secondary_dark = SLATE_800
 
         # Text
-        self.body_text_color = "#d4d4d4"
-        self.body_text_color_dark = "#d4d4d4"
-        self.body_text_color_subdued = "#737373"
-        self.body_text_color_subdued_dark = "#737373"
+        self.body_text_color = SLATE_200
+        self.body_text_color_dark = SLATE_200
+        self.body_text_color_subdued = SLATE_500
+        self.body_text_color_subdued_dark = SLATE_500
 
         # Block styling
-        self.block_background_fill = "#141414"
-        self.block_background_fill_dark = "#141414"
-        self.block_border_color = "#262626"
-        self.block_border_color_dark = "#262626"
+        self.block_background_fill = SLATE_800
+        self.block_background_fill_dark = SLATE_800
+        self.block_border_color = SLATE_700
+        self.block_border_color_dark = SLATE_700
         self.block_border_width = "1px"
-        self.block_label_text_color = "#737373"
-        self.block_label_text_color_dark = "#737373"
+        self.block_label_text_color = SLATE_400
+        self.block_label_text_color_dark = SLATE_400
         self.block_radius = "12px"
         self.block_padding = "16px"
         self.block_shadow = "0 1px 3px 0 rgba(0,0,0,0.3)"
 
         # Inputs
-        self.input_background_fill = "#0a0a0a"
-        self.input_background_fill_dark = "#0a0a0a"
-        self.input_border_color = "#333333"
-        self.input_border_color_dark = "#333333"
+        self.input_background_fill = SLATE_900
+        self.input_background_fill_dark = SLATE_900
+        self.input_border_color = SLATE_600
+        self.input_border_color_dark = SLATE_600
         self.input_border_color_focus = GREEN_500
         self.input_border_color_focus_dark = GREEN_500
 
@@ -106,14 +106,14 @@ class WybeTheme(gr.themes.Base):
         self.button_primary_background_fill_hover_dark = GREEN_500
         self.button_primary_text_color = "#ffffff"
         self.button_primary_text_color_dark = "#ffffff"
-        self.button_secondary_background_fill = "#1e1e1e"
-        self.button_secondary_background_fill_dark = "#1e1e1e"
-        self.button_secondary_text_color = "#d4d4d4"
-        self.button_secondary_text_color_dark = "#d4d4d4"
+        self.button_secondary_background_fill = SLATE_700
+        self.button_secondary_background_fill_dark = SLATE_700
+        self.button_secondary_text_color = SLATE_200
+        self.button_secondary_text_color_dark = SLATE_200
 
         # Borders
-        self.border_color_primary = "#333333"
-        self.border_color_primary_dark = "#333333"
+        self.border_color_primary = SLATE_600
+        self.border_color_primary_dark = SLATE_600
 
         # Shadows
         self.shadow_spread = "1px"
@@ -124,16 +124,16 @@ class WybeTheme(gr.themes.Base):
 WYBE_CSS = """
 /* ── CSS Variables ─────────────────────────────────────────── */
 :root {
-    --wybe-bg-primary: #0a0a0a;
-    --wybe-bg-secondary: #141414;
-    --wybe-bg-tertiary: #1e1e1e;
-    --wybe-bg-hover: #2a2a2a;
+    --wybe-bg-primary: #0f172a;
+    --wybe-bg-secondary: #1e293b;
+    --wybe-bg-tertiary: #334155;
+    --wybe-bg-hover: #3b4d6b;
     --wybe-accent: #22c55e;
     --wybe-accent-hover: #4ade80;
     --wybe-accent-dim: #16a34a;
-    --wybe-text: #d4d4d4;
-    --wybe-text-muted: #737373;
-    --wybe-text-bright: #fafafa;
+    --wybe-text: #e2e8f0;
+    --wybe-text-muted: #64748b;
+    --wybe-text-bright: #f8fafc;
     --wybe-success: #22c55e;
     --wybe-success-dim: #166534;
     --wybe-warning: #eab308;
@@ -142,7 +142,7 @@ WYBE_CSS = """
     --wybe-danger-dim: #991b1b;
     --wybe-purple: #a855f7;
     --wybe-cyan: #06b6d4;
-    --wybe-border: #262626;
+    --wybe-border: #334155;
     --wybe-radius: 12px;
     --wybe-radius-sm: 8px;
     --wybe-radius-xs: 4px;
@@ -383,7 +383,7 @@ footer { display: none !important; }
     align-items: flex-start;
     gap: 10px;
     padding: 8px 0;
-    border-bottom: 1px solid rgba(38,38,38,0.5);
+    border-bottom: 1px solid rgba(51,65,85,0.5);
 }
 .activity-item:last-child { border-bottom: none; }
 .activity-icon {
