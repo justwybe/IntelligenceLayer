@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 import json
+import os
 from typing import Any
+
+from frontend.services.gpu_monitor import get_gpu_info
 
 
 def build_project_context(
@@ -25,12 +28,15 @@ def build_project_context(
     }
     page_line = f"**Current Page**: {page_labels.get(current_page, current_page)} — the user is currently viewing this stage"
 
+    env_lines = _build_environment_context()
+    env_block = "\n".join(env_lines)
+
     if not project_id:
         projects = store.list_projects()
         if not projects:
-            return f"{page_line}\n\nNo projects exist yet. The user needs to create their first project."
+            return f"{page_line}\n\n{env_block}\n\nNo projects exist yet. The user needs to create their first project."
         project_list = ", ".join(f'"{p["name"]}" ({p["id"]})' for p in projects[:5])
-        return f"{page_line}\n\nNo project selected. Available projects: {project_list}"
+        return f"{page_line}\n\n{env_block}\n\nNo project selected. Available projects: {project_list}"
 
     project = store.get_project(project_id)
     if not project:
@@ -38,6 +44,8 @@ def build_project_context(
 
     lines = [
         page_line,
+        "",
+        *env_lines,
         "",
         f"**Active Project**: {project['name']} (ID: {project['id']})",
         f"**Embodiment**: {project['embodiment_tag']}",
@@ -99,6 +107,32 @@ def build_project_context(
         lines.append(f"\n**Suggested Next Step**: {pipeline_hint}")
 
     return "\n".join(lines)
+
+
+def _build_environment_context() -> list[str]:
+    """Build environment/GPU context lines."""
+    lines = []
+
+    # RunPod detection
+    pod_id = os.environ.get("RUNPOD_POD_ID", "")
+    if pod_id:
+        lines.append(f"**Environment**: RunPod GPU Pod (`{pod_id}`)")
+    else:
+        lines.append("**Environment**: Local")
+
+    # GPU info from nvidia-smi
+    gpus = get_gpu_info()
+    if gpus:
+        for i, g in enumerate(gpus):
+            vram = f"{g['memory_used_mb']:.0f}/{g['memory_total_mb']:.0f} MB"
+            lines.append(
+                f"**GPU {i}**: {g['name']} — {g['utilization_pct']:.0f}% util, "
+                f"{vram} VRAM, {g['temperature_c']:.0f}°C"
+            )
+    else:
+        lines.append("**GPU**: Not detected")
+
+    return lines
 
 
 def _derive_pipeline_hint(
