@@ -58,9 +58,7 @@ async def lifespan(app: FastAPI):
     from frontend.services.task_runner import TaskRunner
     from frontend.services.workspace import WorkspaceStore
 
-    # Ensure API key exists
-    api_key = settings.ensure_api_key()
-    logger.info("API key: %s...%s", api_key[:4], api_key[-4:])
+    logger.info("Auth disabled — open access")
 
     # Path validation
     init_allowed_roots(PROJECT_ROOT)
