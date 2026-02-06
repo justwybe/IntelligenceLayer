@@ -1,0 +1,39 @@
+@import "tailwindcss";
+
+@theme inline {
+  /* ── Wybe color palette ── */
+  --color-wybe-bg-primary: #0f172a;
+  --color-wybe-bg-secondary: #1e293b;
+  --color-wybe-bg-tertiary: #334155;
+  --color-wybe-bg-hover: #3b4d6b;
+  --color-wybe-accent: #22c55e;
+  --color-wybe-accent-hover: #4ade80;
+  --color-wybe-accent-dim: #16a34a;
+  --color-wybe-text: #e2e8f0;
+  --color-wybe-text-muted: #64748b;
+  --color-wybe-text-bright: #f8fafc;
+  --color-wybe-border: #334155;
+  --color-wybe-danger: #ef4444;
+  --color-wybe-warning: #eab308;
+  --color-wybe-success: #22c55e;
+  --color-wybe-purple: #a855f7;
+  --color-wybe-cyan: #06b6d4;
+
+  /* ── Fonts ── */
+  --font-sans: var(--font-inter);
+  --font-mono: var(--font-jetbrains-mono);
+}
+
+body {
+  background: var(--color-wybe-bg-primary);
+  color: var(--color-wybe-text);
+}
+
+/* ── GPU bar animations ── */
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}

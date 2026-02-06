@@ -52,6 +52,12 @@ frontend = [
     "anthropic>=0.40.0",
     "python-dotenv>=1.0.0",
 ]
+api = [
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic-settings>=2.0.0",
+    "websockets>=14.0",
+]
 tensorrt = [
     "onnx>=1.20.0",
     "tensorrt>=10.14.1.48.post1",
@@ -59,13 +65,13 @@ tensorrt = [
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["gr00t*", "frontend*"]
+include = ["gr00t*", "frontend*", "api*"]
 
 [tool.uv.extra-build-dependencies]
 flash-attn = ["torch==2.7.0", "numpy==1.26.4"]
 
 [tool.pytest.ini_options]
-testpaths = ["frontend/tests"]
+testpaths = ["frontend/tests", "api/tests"]
 timeout = 30
 
 [tool.ruff]

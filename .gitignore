@@ -169,3 +169,8 @@ offline_open_loop_eval_plots/
 # Generic model/data folders
 /models
 /data
+
+# Next.js frontend
+web/node_modules/
+web/.next/
+web/.env.local

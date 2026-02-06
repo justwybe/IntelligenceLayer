@@ -43,10 +43,12 @@ install_cron_job() {
     (crontab -l 2>/dev/null | grep -v 'scripts/startup.sh'; echo "$CRON_CMD") | crontab -
     log "Cron job installed. Verify with: crontab -l"
 
-    log "Installing supervisord config for wybe-studio..."
+    log "Installing supervisord configs..."
     mkdir -p /etc/supervisor/conf.d
     cp scripts/supervisor/wybe-studio.conf /etc/supervisor/conf.d/wybe-studio.conf
-    log "Supervisord config installed."
+    cp scripts/supervisor/wybe-api.conf /etc/supervisor/conf.d/wybe-api.conf
+    cp scripts/supervisor/wybe-web.conf /etc/supervisor/conf.d/wybe-web.conf
+    log "Supervisord configs installed (wybe-studio, wybe-api, wybe-web)."
 }
 
 # ──────────────────────────────────────────────
@@ -120,6 +122,9 @@ phase_2() {
     log "Installing frontend extras..."
     uv pip install --python .venv/bin/python -e ".[frontend]"
 
+    log "Installing API extras..."
+    uv pip install --python .venv/bin/python -e ".[api]"
+
     log "Verifying frontend imports..."
     .venv/bin/python -c "
 import gradio
@@ -129,6 +134,15 @@ from dotenv import load_dotenv
 print(f'gradio=={gradio.__version__}')
 print(f'anthropic=={anthropic.__version__}')
 print('All frontend imports: OK')
+"
+
+    log "Verifying API imports..."
+    .venv/bin/python -c "
+import fastapi
+import uvicorn
+import pydantic_settings
+print(f'fastapi=={fastapi.__version__}')
+print('All API imports: OK')
 "
 
     log "Creating log directory..."
@@ -148,6 +162,13 @@ phase_3() {
         build-essential yasm cmake libtool git pkg-config \
         libass-dev libfreetype6-dev libvorbis-dev \
         autoconf automake texinfo tmux ffmpeg libegl1 python3.10-dev supervisor
+
+    log "Installing Node.js 22 LTS..."
+    if ! command -v node &> /dev/null; then
+        curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+        apt-get install -y nodejs
+    fi
+    log "Node.js: $(node --version 2>/dev/null || echo 'not installed')"
 
     log "Configuring NVIDIA EGL ICD (headless GPU rendering)..."
     mkdir -p /usr/share/glvnd/egl_vendor.d
@@ -348,6 +369,24 @@ from frontend.app import create_app
 app = create_app()
 print('Wybe Studio frontend: OK')
 "
+
+    # Test 9b: FastAPI imports
+    run_test "FastAPI imports" "$PROJECT_DIR/.venv/bin/python" -c "
+import sys
+sys.path.insert(0, '$PROJECT_DIR')
+from api.main import app
+print(f'FastAPI app: {app.title} v{app.version}')
+print('FastAPI imports: OK')
+"
+
+    # Test 9c: Next.js build
+    if [ -d "$PROJECT_DIR/web/.next" ]; then
+        run_test "Next.js build" bash -c "echo 'Next.js build directory exists: OK'"
+    elif command -v node &> /dev/null && [ -d "$PROJECT_DIR/web" ]; then
+        warn "SKIP: Next.js build not found — run 'cd web && npm run build' first"
+    else
+        warn "SKIP: Next.js (Node.js or web/ not available)"
+    fi
 
     # Test 9: Environment variables
     run_test "Environment variables" bash -c '

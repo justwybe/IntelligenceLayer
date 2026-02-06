@@ -40,12 +40,39 @@ echo "Installing frontend dependencies..."
 uv pip install --python .venv/bin/python -e ".[frontend]" 2>/dev/null || \
     .venv/bin/python -m pip install gradio plotly anthropic python-dotenv 2>/dev/null || true
 
+# Install API dependencies
+echo "Installing API dependencies..."
+uv pip install --python .venv/bin/python -e ".[api]" 2>/dev/null || \
+    .venv/bin/python -m pip install fastapi uvicorn pydantic-settings websockets 2>/dev/null || true
+
+# Install Node.js 22 LTS if not present
+if ! command -v node &> /dev/null; then
+    echo "Installing Node.js 22 LTS..."
+    curl -fsSL https://deb.nodesource.com/setup_22.x | bash -
+    apt-get install -y nodejs
+fi
+echo "Node.js: $(node --version 2>/dev/null || echo 'not installed')"
+
+# Build Next.js frontend
+echo "Building Next.js frontend..."
+if [ -d "$PROJECT_DIR/web" ]; then
+    cd "$PROJECT_DIR/web"
+    npm ci --production=false 2>/dev/null || npm install
+    npm run build
+    cd "$PROJECT_DIR"
+    echo "Next.js build complete."
+else
+    echo "WARNING: web/ directory not found — skipping Next.js build"
+fi
+
 # Create log directory
 mkdir -p /tmp/intelligenceLayer_logs
 
 # Install and start supervisord for process management
 echo "Configuring supervisord..."
 cp scripts/supervisor/wybe-studio.conf /etc/supervisor/conf.d/wybe-studio.conf
+cp scripts/supervisor/wybe-api.conf /etc/supervisor/conf.d/wybe-api.conf
+cp scripts/supervisor/wybe-web.conf /etc/supervisor/conf.d/wybe-web.conf
 
 # Start or reload supervisord
 if pgrep -x supervisord > /dev/null; then
@@ -57,7 +84,7 @@ else
     echo "Supervisord started."
 fi
 
-echo "Frontend status:"
-supervisorctl status wybe-studio
+echo "Service status:"
+supervisorctl status
 
 echo "=== Startup complete ==="
