@@ -5,12 +5,19 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
+from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.auth import require_auth
 from api.deps import get_project_root, get_store, get_task_runner
 from api.schemas.datasets import RunCreate, RunList, RunResponse, RunStatusResponse
+from api.schemas.training import (
+    CheckpointInfo,
+    LossPoint,
+    TrainingMetricsResponse,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +61,161 @@ def _build_cmd(run_type: str, config: dict, project_root: str) -> list[str]:
             output_dir,
         ]
 
+    if run_type == "training":
+        return _build_training_cmd(config, venv_python)
+
+    if run_type == "rl_training":
+        raise HTTPException(
+            status_code=400,
+            detail="Isaac Lab RL training is not yet available",
+        )
+
     raise HTTPException(status_code=400, detail=f"Unknown run type: {run_type}")
+
+
+def _build_training_cmd(config: dict, venv_python: str) -> list[str]:
+    """Build the training subprocess command from config dict.
+
+    Port of frontend/pages/training.py:_build_training_cmd().
+    """
+    dataset_path = config.get("dataset_path", "")
+    base_model = config.get("base_model", "nvidia/GR00T-N1.6-3B")
+    embodiment = config.get("embodiment_tag", "new_embodiment")
+
+    # Extract path from "name | path" dropdown format
+    if "|" in dataset_path:
+        dataset_path = dataset_path.split("|")[-1].strip()
+    if "|" in base_model:
+        base_model = base_model.split("|")[-1].strip()
+
+    cmd = [
+        venv_python, "-m", "gr00t.experiment.launch_finetune",
+        "--base_model_path", base_model,
+        "--dataset_path", dataset_path,
+        "--embodiment_tag", embodiment,
+        "--learning_rate", str(config.get("learning_rate", 1e-4)),
+        "--max_steps", str(int(config.get("max_steps", 10000))),
+        "--global_batch_size", str(int(config.get("global_batch_size", 64))),
+        "--weight_decay", str(config.get("weight_decay", 1e-5)),
+        "--warmup_ratio", str(config.get("warmup_ratio", 0.05)),
+        "--save_steps", str(int(config.get("save_steps", 1000))),
+        "--shard_size", str(int(config.get("shard_size", 1024))),
+        "--episode_sampling_rate", str(config.get("episode_sampling_rate", 0.1)),
+        "--output_dir", config.get("output_dir", "./outputs"),
+    ]
+
+    # Tuning flags
+    if config.get("tune_llm"):
+        cmd.append("--tune_llm")
+    if config.get("tune_visual"):
+        cmd.append("--tune_visual")
+    if not config.get("tune_projector", True):
+        cmd.append("--no-tune_projector")
+    if not config.get("tune_diffusion", True):
+        cmd.append("--no-tune_diffusion_model")
+    if config.get("use_wandb"):
+        cmd.append("--use_wandb")
+
+    # Distributed / advanced
+    num_gpus = int(config.get("num_gpus", 1))
+    cmd.extend(["--num_gpus", str(num_gpus)])
+    cmd.extend(["--gradient_accumulation_steps", str(int(config.get("gradient_accumulation_steps", 1)))])
+    cmd.extend(["--save_total_limit", str(int(config.get("save_total_limit", 5)))])
+    cmd.extend(["--dataloader_num_workers", str(int(config.get("dataloader_num_workers", 4)))])
+
+    deepspeed_stage = int(config.get("deepspeed_stage", 2))
+    if deepspeed_stage != 2:
+        cmd.extend(["--deepspeed_stage", str(deepspeed_stage)])
+    if config.get("gradient_checkpointing"):
+        cmd.append("--gradient_checkpointing")
+
+    optimizer = config.get("optimizer", "adamw_torch_fused")
+    if optimizer != "adamw_torch_fused":
+        cmd.extend(["--optim", optimizer])
+
+    lr_scheduler = config.get("lr_scheduler", "cosine")
+    if lr_scheduler != "cosine":
+        cmd.extend(["--lr_scheduler_type", lr_scheduler])
+
+    # Image augmentation
+    if config.get("color_jitter"):
+        cmd.extend([
+            "--color_jitter_params",
+            "brightness", str(config.get("brightness", 0.3)),
+            "contrast", str(config.get("contrast", 0.3)),
+            "saturation", str(config.get("saturation", 0.3)),
+            "hue", str(config.get("hue", 0.1)),
+        ])
+    rotation = int(config.get("random_rotation", 0))
+    if rotation > 0:
+        cmd.extend(["--random_rotation_angle", str(rotation)])
+
+    state_dropout = float(config.get("state_dropout", 0))
+    if state_dropout > 0:
+        cmd.extend(["--state_dropout_prob", str(state_dropout)])
+    if config.get("enable_profiling"):
+        cmd.append("--enable_profiling")
+
+    # Evaluation
+    if config.get("eval_enable"):
+        cmd.extend([
+            "--eval_strategy", "steps",
+            "--eval_steps", str(int(config.get("eval_steps", 500))),
+        ])
+
+    # Resume from checkpoint
+    resume_ckpt = config.get("resume_checkpoint_path")
+    if resume_ckpt:
+        ckpt_parent = str(Path(resume_ckpt).parent)
+        for i, arg in enumerate(cmd):
+            if arg == "--output_dir" and i + 1 < len(cmd):
+                cmd[i + 1] = ckpt_parent
+                break
+
+    return cmd
+
+
+def _parse_training_metrics(
+    log_text: str, max_steps: int, status: str,
+) -> TrainingMetricsResponse:
+    """Parse training log text into structured metrics."""
+    steps: list[int] = []
+    losses: list[float] = []
+    checkpoints: list[CheckpointInfo] = []
+    current_step = 0
+
+    for line in log_text.splitlines():
+        # Loss: {'loss': 0.1234, ..., 'step': 500}
+        m = re.search(r"'loss':\s*([\d.e+-]+).*'step':\s*(\d+)", line)
+        if m:
+            losses.append(float(m.group(1)))
+            step = int(m.group(2))
+            steps.append(step)
+            current_step = max(current_step, step)
+
+        # Checkpoint: Saving model checkpoint to /path/to/checkpoint-5000
+        m = re.search(r"Saving model checkpoint to (.+?)(?:\s|$)", line)
+        if m:
+            ckpt_path = m.group(1).strip()
+            step_m = re.search(r"checkpoint-(\d+)", ckpt_path)
+            checkpoints.append(CheckpointInfo(
+                path=ckpt_path,
+                step=int(step_m.group(1)) if step_m else None,
+            ))
+
+    loss_curve = [
+        LossPoint(step=s, loss=l) for s, l in zip(steps, losses)
+    ]
+    progress_pct = (current_step / max_steps * 100) if max_steps > 0 else 0
+
+    return TrainingMetricsResponse(
+        loss_curve=loss_curve,
+        checkpoints=checkpoints,
+        current_step=current_step,
+        max_steps=max_steps,
+        progress_pct=min(progress_pct, 100.0),
+        status=status,
+    )
 
 
 @router.get("", response_model=RunList)
@@ -118,6 +279,30 @@ async def get_run_status(
     status = task_runner.status(run_id)
     log_tail = task_runner.tail_log(run_id, 80)
     return RunStatusResponse(status=status, log_tail=log_tail)
+
+
+@router.get("/{run_id}/metrics", response_model=TrainingMetricsResponse)
+async def get_run_metrics(
+    run_id: str,
+    store=Depends(get_store),
+    task_runner=Depends(get_task_runner),
+) -> TrainingMetricsResponse:
+    run = store.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    status = task_runner.status(run_id)
+    log_text = task_runner.tail_log(run_id, 500)
+
+    # Get max_steps from run config
+    max_steps = 10000
+    try:
+        config = json.loads(run["config"]) if isinstance(run["config"], str) else run["config"]
+        max_steps = int(config.get("max_steps", 10000))
+    except Exception:
+        logger.debug("Failed to parse config for run %s", run_id, exc_info=True)
+
+    return _parse_training_metrics(log_text, max_steps, status)
 
 
 @router.post("/{run_id}/stop")

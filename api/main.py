@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 from api.config import settings
-from api.routers import activity, datasets, gpu, health, projects, runs, server
+from api.routers import activity, datasets, gpu, health, models, projects, runs, server, training
 from api.ws.gpu import gpu_manager, router as gpu_ws_router
 
 logger = logging.getLogger(__name__)
@@ -134,6 +134,8 @@ app.include_router(activity.router)
 app.include_router(server.router)
 app.include_router(datasets.router)
 app.include_router(runs.router)
+app.include_router(training.router)
+app.include_router(models.router)
 
 # WebSocket router
 app.include_router(gpu_ws_router)

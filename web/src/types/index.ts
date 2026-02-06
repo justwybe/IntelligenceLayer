@@ -105,3 +105,60 @@ export interface RunStatus {
   status: string;
   log_tail: string;
 }
+
+// ── Training ─────────────────────────────────────────────────────────
+
+export interface TrainingPreset {
+  learning_rate: number;
+  max_steps: number;
+  global_batch_size: number;
+  weight_decay: number;
+  warmup_ratio: number;
+  save_steps: number;
+  shard_size: number;
+  episode_sampling_rate: number;
+}
+
+export interface TrainingConstants {
+  presets: Record<string, TrainingPreset>;
+  embodiment_choices: string[];
+  isaac_lab_envs: string[];
+  rl_algorithms: string[];
+  optimizer_choices: string[];
+  lr_scheduler_choices: string[];
+  deepspeed_stages: string[];
+}
+
+export interface LossPoint {
+  step: number;
+  loss: number;
+}
+
+export interface CheckpointInfo {
+  path: string;
+  step: number | null;
+}
+
+export interface TrainingMetrics {
+  loss_curve: LossPoint[];
+  checkpoints: CheckpointInfo[];
+  current_step: number;
+  max_steps: number;
+  progress_pct: number;
+  status: string;
+}
+
+// ── Models ───────────────────────────────────────────────────────────
+
+export interface Model {
+  id: string;
+  project_id: string | null;
+  name: string;
+  path: string;
+  source_run_id: string | null;
+  base_model: string | null;
+  embodiment_tag: string | null;
+  step: number | null;
+  created_at: string;
+  notes: string | null;
+}
