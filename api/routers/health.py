@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import json
+import os
 import platform
 import time
 
 from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 
 from api.schemas.projects import HealthResponse
@@ -45,6 +48,19 @@ async def health(request: Request) -> HealthResponse:
         db_ok=db_ok,
         uptime_seconds=round(time.time() - start_time, 1),
     )
+
+
+@router.get("/health/monitor")
+async def health_monitor() -> JSONResponse:
+    """Return the latest health monitor status from health_status.json."""
+    log_dir = os.environ.get("WYBE_LOG_DIR", "/tmp/intelligenceLayer_logs")
+    status_file = os.path.join(log_dir, "health_status.json")
+    try:
+        with open(status_file) as f:
+            data = json.load(f)
+        return JSONResponse(content=data)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return JSONResponse(content={"status": "no monitor data"})
 
 
 @router.get("/system-info", response_model=SystemInfoResponse)

@@ -5,6 +5,12 @@ PROJECT_DIR="${PROJECT_DIR:-/root/IntelligenceLayer}"
 
 echo "=== RunPod Pod Restart Recovery ==="
 
+# Set up network volume (if attached) before anything else
+if [ -d /runpod-volume ]; then
+    echo "Setting up network volume..."
+    bash "$PROJECT_DIR/scripts/setup_volume.sh" || echo "WARNING: Volume setup failed — continuing without volume"
+fi
+
 # Reinstall system packages lost on pod restart
 echo "Installing system packages..."
 apt-get update && apt-get install -y \
@@ -65,8 +71,9 @@ else
     echo "WARNING: web/ directory not found — skipping Next.js build"
 fi
 
-# Create log directory
-mkdir -p /tmp/intelligenceLayer_logs
+# Create log directory (may already be a symlink to volume)
+LOG_DIR="${WYBE_LOG_DIR:-/tmp/intelligenceLayer_logs}"
+mkdir -p "$LOG_DIR"
 
 # Install and start supervisord for process management
 echo "Configuring supervisord..."
@@ -86,5 +93,16 @@ fi
 
 echo "Service status:"
 supervisorctl status
+
+# Install cron jobs for auto-deploy and health monitoring
+echo "Installing cron jobs..."
+CRON_DEPLOY="*/5 * * * * cd $PROJECT_DIR && bash scripts/auto_deploy.sh >> $LOG_DIR/deploy.log 2>&1"
+CRON_HEALTH="*/2 * * * * cd $PROJECT_DIR && bash scripts/health_monitor.sh >> $LOG_DIR/health.log 2>&1"
+(
+    crontab -l 2>/dev/null | grep -v 'auto_deploy.sh' | grep -v 'health_monitor.sh'
+    echo "$CRON_DEPLOY"
+    echo "$CRON_HEALTH"
+) | crontab -
+echo "Cron jobs installed (auto-deploy every 5m, health check every 2m)."
 
 echo "=== Startup complete ==="
