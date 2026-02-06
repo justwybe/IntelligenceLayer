@@ -12,9 +12,8 @@ apt-get update && apt-get install -y \
     libass-dev libfreetype6-dev libvorbis-dev \
     autoconf automake texinfo tmux ffmpeg libegl1 software-properties-common
 
-# Python 3.10 headers
-add-apt-repository -y ppa:deadsnakes/ppa
-apt-get update && apt-get install -y python3.10-dev
+# Python 3.10 headers (PPA usually already present from setup_production.sh)
+apt-get install -y python3.10-dev 2>/dev/null || true
 
 # EGL ICD
 mkdir -p /usr/share/glvnd/egl_vendor.d
