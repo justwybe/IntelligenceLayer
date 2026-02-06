@@ -11,13 +11,13 @@ RUN pip install --upgrade pip setuptools
 RUN pip install uv
 RUN sed -i s/dill==0.3.9/dill==0.3.8/g /etc/pip/constraint.txt
 RUN sed -i s/scipy==1.15.2/scipy==1.15.3/g /etc/pip/constraint.txt
-RUN pip install imageio h5py boto3 transformers[torch] deepspeed timm peft diffusers wandb tianshou dm_tree openai albumentations==1.4.18 decord==0.6.0 torchcodec==0.4.0
+RUN pip install imageio h5py boto3 transformers[torch] deepspeed timm peft diffusers wandb tianshou dm_tree albumentations==1.4.18 decord==0.6.0 torchcodec==0.4.0
 RUN mkdir -p /opt
 RUN cd /opt && git clone https://github.com/facebookresearch/pytorch3d.git
 RUN cd /opt/pytorch3d && pip install .
 
 COPY src/gr00t/ /workspace/gr00t/
-RUN cd /workspace/gr00t && uv sync && uv pip install -e .
+RUN cd /workspace/gr00t && uv sync && uv pip install -e ".[frontend]"
 
 RUN apt-get install -y libegl1
 RUN mkdir -p /usr/share/glvnd/egl_vendor.d && \
@@ -40,3 +40,7 @@ RUN mkdir -p /usr/share/vulkan/icd.d && \
     }
 }
 EOF
+
+RUN mkdir -p /tmp/intelligenceLayer_logs
+
+EXPOSE 7860

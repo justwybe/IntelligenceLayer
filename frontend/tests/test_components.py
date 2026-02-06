@@ -60,17 +60,17 @@ class TestIcons:
 
 class TestPipelineStepper:
     def test_renders_all_pages(self):
-        html = render_pipeline_stepper("dashboard")
-        for page in ["dashboard", "data", "train", "evaluate", "deploy"]:
+        html = render_pipeline_stepper("datasets")
+        for page in ["datasets", "training", "simulation", "models"]:
             assert f'data-page="{page}"' in html
 
     def test_active_page_highlighted(self):
-        html = render_pipeline_stepper("train")
+        html = render_pipeline_stepper("training")
         # The active page node gets the "active" CSS class
         assert "active" in html
 
     def test_returns_non_empty_string(self):
-        html = render_pipeline_stepper("data")
+        html = render_pipeline_stepper("datasets")
         assert isinstance(html, str)
         assert len(html) > 50
 

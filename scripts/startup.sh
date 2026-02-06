@@ -1,8 +1,16 @@
 #!/bin/bash
 set -e
 
+PROJECT_DIR="${PROJECT_DIR:-/root/IntelligenceLayer}"
+
+echo "=== RunPod Pod Restart Recovery ==="
+
 # Reinstall system packages lost on pod restart
-apt-get update && apt-get install -y build-essential yasm cmake libtool git pkg-config libass-dev libfreetype6-dev libvorbis-dev autoconf automake texinfo tmux ffmpeg libegl1 software-properties-common
+echo "Installing system packages..."
+apt-get update && apt-get install -y \
+    build-essential yasm cmake libtool git pkg-config \
+    libass-dev libfreetype6-dev libvorbis-dev \
+    autoconf automake texinfo tmux ffmpeg libegl1 software-properties-common
 
 # Python 3.10 headers
 add-apt-repository -y ppa:deadsnakes/ppa
@@ -20,15 +28,25 @@ echo '{"file_format_version":"1.0.0","ICD":{"library_path":"libGLX_nvidia.so.0",
 pip install isaacsim==5.1.0.0
 
 # Load env vars
-cd /root/IntelligenceLayer
-set -a && source .env && set +a
+cd "$PROJECT_DIR"
+if [ -f .env ]; then
+    set -a && source .env && set +a
+    echo "Environment variables loaded."
+else
+    echo "WARNING: .env not found — copy .env.example to .env and add your ANTHROPIC_API_KEY"
+fi
 
-# Install Gradio frontend dependencies
-.venv/bin/python -m pip install gradio plotly 2>/dev/null || true
+# Install frontend dependencies using the proper extras
+echo "Installing frontend dependencies..."
+uv pip install --python .venv/bin/python -e ".[frontend]" 2>/dev/null || \
+    .venv/bin/python -m pip install gradio plotly anthropic python-dotenv 2>/dev/null || true
+
+# Create log directory
+mkdir -p /tmp/intelligenceLayer_logs
 
 # Launch Gradio frontend in the background
 echo "Starting Gradio frontend on port 7860..."
 nohup .venv/bin/python -m frontend.app > /tmp/intelligenceLayer_logs/gradio.log 2>&1 &
 echo "Gradio PID: $!"
 
-echo "Startup complete."
+echo "=== Startup complete ==="

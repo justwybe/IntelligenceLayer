@@ -4,17 +4,19 @@
 # RTX A6000 (48GB) — runpod/pytorch:2.4.0-py3.11 base image
 #
 # Phases:
-#   1. Resolve transformers + clean venv rebuild
-#   3. System dependencies + EGL/Vulkan rendering
-#   4. Isaac Sim (system Python 3.11)
-#   5. TensorRT optimization
-#   6. Verification
+#   1.  Clean venv rebuild with transformers==4.51.3
+#   1w. Download model weights (6.2 GB)
+#   2.  Install frontend dependencies (Gradio, Anthropic, etc.)
+#   3.  System dependencies + EGL/Vulkan rendering
+#   4.  Isaac Sim (system Python 3.11)
+#   5.  TensorRT optimization
+#   6.  Verification
 #
 # Usage:
 #   bash scripts/setup_production.sh [phase]
 #   bash scripts/setup_production.sh all
 #   bash scripts/setup_production.sh 1
-#   bash scripts/setup_production.sh 3
+#   bash scripts/setup_production.sh 2
 #   bash scripts/setup_production.sh verify
 # ──────────────────────────────────────────────────────────────
 set -euo pipefail
@@ -92,6 +94,32 @@ print('Model weights downloaded successfully')
     fi
 
     log "Phase 1.5 complete."
+}
+
+# ──────────────────────────────────────────────
+# Phase 2: Frontend dependencies (Gradio, Anthropic, etc.)
+# ──────────────────────────────────────────────
+phase_2() {
+    log "Phase 2: Installing frontend dependencies"
+
+    log "Installing frontend extras..."
+    uv pip install --python .venv/bin/python -e ".[frontend]"
+
+    log "Verifying frontend imports..."
+    .venv/bin/python -c "
+import gradio
+import anthropic
+import plotly
+from dotenv import load_dotenv
+print(f'gradio=={gradio.__version__}')
+print(f'anthropic=={anthropic.__version__}')
+print('All frontend imports: OK')
+"
+
+    log "Creating log directory..."
+    mkdir -p /tmp/intelligenceLayer_logs
+
+    log "Phase 2 complete."
 }
 
 # ──────────────────────────────────────────────
@@ -297,7 +325,16 @@ print('Isaac Sim import: OK')
         warn "SKIP: Isaac Sim (system Python is $SYS_PY_VER, not 3.11)"
     fi
 
-    # Test 8: Environment variables
+    # Test 8: Frontend (Gradio + assistant)
+    run_test "Frontend imports" "$PROJECT_DIR/.venv/bin/python" -c "
+import sys
+sys.path.insert(0, '$PROJECT_DIR')
+from frontend.app import create_app
+app = create_app()
+print('Wybe Studio frontend: OK')
+"
+
+    # Test 9: Environment variables
     run_test "Environment variables" bash -c '
         [ -f '"$PROJECT_DIR"'/.env ] && \
         grep -q "MUJOCO_GL=egl" '"$PROJECT_DIR"'/.env && \
@@ -322,6 +359,7 @@ print('Isaac Sim import: OK')
 case "${1:-all}" in
     1)       phase_1 ;;
     1w|weights) phase_1_weights ;;
+    2)       phase_2 ;;
     3)       phase_3 ;;
     4)       phase_4 ;;
     5)       phase_5 ;;
@@ -329,17 +367,19 @@ case "${1:-all}" in
     all)
         phase_1
         phase_1_weights
+        phase_2
         phase_3
         phase_4
         phase_5
         phase_6
         ;;
     *)
-        echo "Usage: $0 {1|1w|3|4|5|6|verify|all}"
+        echo "Usage: $0 {1|1w|2|3|4|5|6|verify|all}"
         echo ""
         echo "Phases:"
         echo "  1       Clean venv rebuild with transformers==4.51.3"
-        echo "  1w      Download model weights"
+        echo "  1w      Download model weights (6.2 GB)"
+        echo "  2       Frontend dependencies (Gradio, Anthropic)"
         echo "  3       System deps + EGL/Vulkan"
         echo "  4       Isaac Sim (Python 3.11)"
         echo "  5       TensorRT optimization"

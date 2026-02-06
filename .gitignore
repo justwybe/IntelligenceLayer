@@ -132,6 +132,9 @@ cython_debug/
 .DS_Store
 *.code-workspace
 
+# Environment variables (contains secrets)
+.env
+
 # Virtual environments
 .venv/
 .venv/*
