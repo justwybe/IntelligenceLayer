@@ -81,24 +81,24 @@ if echo "$CHANGED" | grep -q "^web/"; then
     fi
 fi
 
-# Check if Python code changed
-if echo "$CHANGED" | grep -qE "^(api/|frontend/|pyproject\.toml)"; then
-    log "Reinstalling Python packages..."
+# Check if Python dependencies changed (pyproject.toml)
+if echo "$CHANGED" | grep -q "^pyproject\.toml"; then
+    log "Reinstalling Python packages (pyproject.toml changed)..."
     if uv pip install --python "$PROJECT_DIR/.venv/bin/python" -e ".[api,frontend]" 2>/dev/null || \
        "$PROJECT_DIR/.venv/bin/python" -m pip install -e ".[api,frontend]" 2>/dev/null; then
-        REBUILT="$REBUILT python"
+        REBUILT="$REBUILT python-deps"
     else
         err "Python install failed — keeping old version running."
         exit 1
     fi
+fi
 
-    # Determine which Python services to restart
-    if echo "$CHANGED" | grep -q "^api/"; then
-        RESTART_SERVICES="$RESTART_SERVICES wybe-api"
-    fi
-    if echo "$CHANGED" | grep -q "^frontend/"; then
-        RESTART_SERVICES="$RESTART_SERVICES wybe-studio"
-    fi
+# Check if Python source code changed (just needs service restart, no reinstall)
+if echo "$CHANGED" | grep -q "^api/"; then
+    RESTART_SERVICES="$RESTART_SERVICES wybe-api"
+fi
+if echo "$CHANGED" | grep -q "^frontend/"; then
+    RESTART_SERVICES="$RESTART_SERVICES wybe-studio"
 fi
 
 # Check if supervisor configs changed
