@@ -58,9 +58,7 @@ async def lifespan(app: FastAPI):
     from frontend.services.task_runner import TaskRunner
     from frontend.services.workspace import WorkspaceStore
 
-    # Ensure API key exists (auto-generate if needed)
-    api_key = settings.ensure_api_key()
-    if api_key:
+    if settings.wybe_api_key:
         logger.info("Auth enabled — API key required")
     else:
         logger.info("Auth disabled — open access")
