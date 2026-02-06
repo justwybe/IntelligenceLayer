@@ -10,7 +10,7 @@ echo "Installing system packages..."
 apt-get update && apt-get install -y \
     build-essential yasm cmake libtool git pkg-config \
     libass-dev libfreetype6-dev libvorbis-dev \
-    autoconf automake texinfo tmux ffmpeg libegl1 software-properties-common
+    autoconf automake texinfo tmux ffmpeg libegl1 software-properties-common supervisor
 
 # Python 3.10 headers (PPA usually already present from setup_production.sh)
 apt-get install -y python3.10-dev 2>/dev/null || true
@@ -43,9 +43,21 @@ uv pip install --python .venv/bin/python -e ".[frontend]" 2>/dev/null || \
 # Create log directory
 mkdir -p /tmp/intelligenceLayer_logs
 
-# Launch Gradio frontend in the background
-echo "Starting Gradio frontend on port 7860..."
-nohup .venv/bin/python -m frontend.app > /tmp/intelligenceLayer_logs/gradio.log 2>&1 &
-echo "Gradio PID: $!"
+# Install and start supervisord for process management
+echo "Configuring supervisord..."
+cp scripts/supervisor/wybe-studio.conf /etc/supervisor/conf.d/wybe-studio.conf
+
+# Start or reload supervisord
+if pgrep -x supervisord > /dev/null; then
+    supervisorctl reread
+    supervisorctl update
+    echo "Supervisord reloaded."
+else
+    supervisord -c /etc/supervisor/supervisord.conf
+    echo "Supervisord started."
+fi
+
+echo "Frontend status:"
+supervisorctl status wybe-studio
 
 echo "=== Startup complete ==="

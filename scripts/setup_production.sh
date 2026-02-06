@@ -35,6 +35,21 @@ err()  { echo -e "${RED}[$(date +%H:%M:%S)] ERROR: $*${NC}" >&2; }
 die()  { err "$@"; exit 1; }
 
 # ──────────────────────────────────────────────
+# Helper: Install @reboot cron job for auto-start
+# ──────────────────────────────────────────────
+install_cron_job() {
+    log "Installing @reboot cron job for frontend auto-start..."
+    CRON_CMD="@reboot cd /root/IntelligenceLayer && bash scripts/startup.sh >> /tmp/intelligenceLayer_logs/startup_cron.log 2>&1"
+    (crontab -l 2>/dev/null | grep -v 'scripts/startup.sh'; echo "$CRON_CMD") | crontab -
+    log "Cron job installed. Verify with: crontab -l"
+
+    log "Installing supervisord config for wybe-studio..."
+    mkdir -p /etc/supervisor/conf.d
+    cp scripts/supervisor/wybe-studio.conf /etc/supervisor/conf.d/wybe-studio.conf
+    log "Supervisord config installed."
+}
+
+# ──────────────────────────────────────────────
 # Phase 1: Clean venv rebuild with correct transformers
 # ──────────────────────────────────────────────
 phase_1() {
@@ -132,7 +147,7 @@ phase_3() {
     apt-get update && apt-get install -y \
         build-essential yasm cmake libtool git pkg-config \
         libass-dev libfreetype6-dev libvorbis-dev \
-        autoconf automake texinfo tmux ffmpeg libegl1 python3.10-dev
+        autoconf automake texinfo tmux ffmpeg libegl1 python3.10-dev supervisor
 
     log "Configuring NVIDIA EGL ICD (headless GPU rendering)..."
     mkdir -p /usr/share/glvnd/egl_vendor.d
@@ -351,6 +366,8 @@ print('Wybe Studio frontend: OK')
         err "Some tests failed. Review output above."
         return 1
     fi
+
+    install_cron_job
 }
 
 # ──────────────────────────────────────────────

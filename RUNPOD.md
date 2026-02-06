@@ -2,16 +2,38 @@
 
 ## After pod restart/unpause
 
-Files on `/root/` survive. Reinstall system packages and relaunch frontend:
+Files on `/root/` survive. The frontend **auto-starts** on pod restart via:
+
+1. `@reboot` cron job runs `startup.sh`
+2. `startup.sh` reinstalls system packages and starts **supervisord**
+3. Supervisord manages the Gradio process — auto-restarts on crash
+
+No manual intervention is needed.
+
+If the cron job isn't installed yet, or you need to manually restart:
 
 ```bash
 cd /root/IntelligenceLayer && bash scripts/startup.sh
 ```
 
-Verify everything works:
+### Managing the frontend with supervisord
 
 ```bash
-bash scripts/setup_production.sh verify
+supervisorctl status wybe-studio     # check if running
+supervisorctl restart wybe-studio    # restart the frontend
+supervisorctl stop wybe-studio       # stop the frontend
+supervisorctl start wybe-studio      # start the frontend
+supervisorctl tail -f wybe-studio    # follow live logs
+```
+
+Logs: `/tmp/intelligenceLayer_logs/gradio.log` (50MB max, 3 rotated backups).
+
+### Verify everything works
+
+```bash
+bash scripts/setup_production.sh verify   # also installs cron job + supervisor config
+crontab -l                                 # confirm @reboot entry exists
+supervisorctl status wybe-studio          # should show RUNNING
 ```
 
 ## After pod termination (full rebuild)
@@ -45,9 +67,12 @@ cd /root/IntelligenceLayer
 
 ## Start Wybe Studio (frontend only)
 
+The frontend is managed by supervisord and auto-starts. To manually run it (e.g. for debugging):
+
 ```bash
+supervisorctl stop wybe-studio                    # stop supervised instance first
 cd /root/IntelligenceLayer
-.venv/bin/python -m frontend.app
+.venv/bin/python -m frontend.app                   # run in foreground
 ```
 
 The frontend launches on port 7860 with HTTPS.
@@ -58,6 +83,6 @@ The frontend launches on port 7860 with HTTPS.
 - **Isaac Sim**: System Python 3.11 — separate environment
 - **Model weights**: `checkpoints/GR00T-N1.6-3B` (6.2 GB, re-download with `bash scripts/setup_production.sh 1w`)
 - **Inference server**: ZMQ on `tcp://127.0.0.1:5555`
-- **Frontend**: Gradio on port 7860 (auto-launched by `startup.sh`)
+- **Frontend**: Gradio on port 7860 (managed by supervisord, auto-restarts on crash)
 - **AI Assistant**: Requires `ANTHROPIC_API_KEY` in `.env`
 - **TensorRT**: `bash scripts/setup_production.sh 5`
