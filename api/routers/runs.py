@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from api.auth import require_auth
-from api.deps import get_project_root, get_store, get_task_runner
+from api.deps import get_project_root, get_store, get_task_runner, validate_path_param
 from api.schemas.datasets import RunCreate, RunList, RunResponse, RunStatusResponse
 from api.schemas.models import BenchmarkMetricsResponse, BenchmarkRow
 from api.schemas.simulation import (
@@ -375,12 +375,35 @@ def _build_training_cmd(config: dict, venv_python: str) -> list[str]:
     if config.get("enable_profiling"):
         cmd.append("--enable_profiling")
 
+    # Precision flags
+    max_grad_norm = config.get("max_grad_norm")
+    if max_grad_norm is not None:
+        cmd.extend(["--max_grad_norm", str(max_grad_norm)])
+
+    if config.get("bf16", True):
+        cmd.append("--bf16")
+    else:
+        cmd.append("--no-bf16")
+
+    if config.get("fp16", False):
+        cmd.append("--fp16")
+    else:
+        cmd.append("--no-fp16")
+
+    if config.get("tf32", True):
+        cmd.append("--tf32")
+    else:
+        cmd.append("--no-tf32")
+
     # Evaluation
     if config.get("eval_enable"):
         cmd.extend([
             "--eval_strategy", "steps",
             "--eval_steps", str(int(config.get("eval_steps", 500))),
         ])
+        eval_split = config.get("eval_split_ratio")
+        if eval_split is not None:
+            cmd.extend(["--eval_split_ratio", str(eval_split)])
 
     # Resume from checkpoint
     resume_ckpt = config.get("resume_checkpoint_path")
@@ -460,8 +483,17 @@ async def create_run(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
-    # For evaluation runs, inject save_plot_path into config
+    # Validate user-supplied paths in the config
     config = dict(body.config)
+    for path_key in ("dataset_path", "model_path", "output_dir", "onnx_path", "engine_path"):
+        val = config.get(path_key, "")
+        if val and isinstance(val, str):
+            # Strip "name | path" dropdown format before validating
+            raw = val.split("|")[-1].strip() if "|" in val else val
+            if raw:
+                validate_path_param(raw)
+
+    # For evaluation runs, inject save_plot_path into config
     if body.run_type == "evaluation":
         save_dir = _get_eval_output_dir("")  # we need run_id first
         # We'll set it after creating the run

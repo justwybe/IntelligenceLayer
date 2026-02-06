@@ -160,9 +160,34 @@ export function IsaacLabRlForm({ projectId }: Props) {
       {/* Right: RL Monitor placeholder */}
       <div className="space-y-4">
         <h3 className="text-sm font-semibold text-wybe-text-bright">RL Monitor</h3>
-        <div className="flex items-center justify-center h-64 text-sm text-wybe-text-muted border border-wybe-border rounded-lg">
-          RL monitoring will be available once backend integration is complete
+
+        {/* Log output placeholder */}
+        <div>
+          <label className="block text-xs text-wybe-text-muted mb-1">Training Log</label>
+          <div className="bg-wybe-bg-primary border border-wybe-border rounded-lg p-3 h-32 overflow-y-auto font-mono text-xs text-wybe-text-muted">
+            Waiting for RL training to start...
+          </div>
         </div>
+
+        {/* Reward curve placeholder */}
+        <div>
+          <label className="block text-xs text-wybe-text-muted mb-1">Reward Curve</label>
+          <div className="flex items-center justify-center h-40 border border-wybe-border rounded-lg bg-wybe-bg-primary">
+            <span className="text-xs text-wybe-text-muted">
+              No reward data — start a training run to see the reward curve
+            </span>
+          </div>
+        </div>
+
+        {/* Status */}
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-wybe-text-muted" />
+          <span className="text-xs text-wybe-text-muted">Idle</span>
+        </div>
+
+        <p className="text-xs text-wybe-text-muted bg-wybe-bg-secondary border border-wybe-border rounded p-2">
+          Isaac Lab RL backend integration is not yet available. Monitor and reward visualization will be enabled in a future release.
+        </p>
       </div>
     </div>
   );

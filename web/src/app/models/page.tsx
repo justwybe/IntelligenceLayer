@@ -22,6 +22,14 @@ export default function ModelsPage() {
         <p className="text-sm text-wybe-text-muted mt-1">Version & deploy</p>
       </div>
 
+      {!projectId && (
+        <div className="bg-wybe-bg-secondary border border-wybe-border rounded-xl p-6 text-center">
+          <p className="text-sm text-wybe-text-muted">
+            Select a project from the header to get started.
+          </p>
+        </div>
+      )}
+
       {/* Model Registry (always visible) */}
       <div className="bg-wybe-bg-secondary border border-wybe-border rounded-xl p-4">
         <ModelRegistry projectId={projectId} />

@@ -6,7 +6,9 @@ via these thin dependency functions.
 
 from __future__ import annotations
 
-from fastapi import Request
+from fastapi import HTTPException, Request
+
+from frontend.services.path_utils import validate_path
 
 
 def get_store(request: Request):
@@ -32,3 +34,11 @@ def get_agent(request: Request):
 def get_project_root(request: Request) -> str:
     """Return the project root path."""
     return request.app.state.project_root
+
+
+def validate_path_param(path: str, *, must_exist: bool = False) -> str:
+    """Validate a user-supplied path and return it, or raise 400."""
+    error = validate_path(path, must_exist=must_exist)
+    if error:
+        raise HTTPException(status_code=400, detail=error)
+    return path

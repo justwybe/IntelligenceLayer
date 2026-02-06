@@ -29,6 +29,14 @@ export default function SimulationPage() {
         </p>
       </div>
 
+      {!projectId && (
+        <div className="bg-wybe-bg-secondary border border-wybe-border rounded-xl p-6 text-center">
+          <p className="text-sm text-wybe-text-muted">
+            Select a project from the header to get started.
+          </p>
+        </div>
+      )}
+
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-wybe-border">
         {TABS.map((tab) => (

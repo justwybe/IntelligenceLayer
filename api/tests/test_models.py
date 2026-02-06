@@ -117,30 +117,30 @@ class TestServerDeployStop:
 
 
 class TestRunTypes:
-    def test_create_onnx_export_run(self, client, project_id):
+    def test_create_onnx_export_run(self, client, project_id, tmp_path):
         resp = client.post(
             f"/api/runs?project_id={project_id}",
             json={
                 "run_type": "onnx_export",
                 "config": {
-                    "model_path": "/test/model",
-                    "dataset_path": "/test/dataset",
+                    "model_path": str(tmp_path / "model"),
+                    "dataset_path": str(tmp_path / "dataset"),
                     "embodiment_tag": "new_embodiment",
-                    "output_dir": "/test/output",
+                    "output_dir": str(tmp_path / "output"),
                 },
             },
         )
         assert resp.status_code == 201
         assert resp.json()["run_type"] == "onnx_export"
 
-    def test_create_tensorrt_build_run(self, client, project_id):
+    def test_create_tensorrt_build_run(self, client, project_id, tmp_path):
         resp = client.post(
             f"/api/runs?project_id={project_id}",
             json={
                 "run_type": "tensorrt_build",
                 "config": {
-                    "onnx_path": "/test/model.onnx",
-                    "engine_path": "/test/model.bf16.trt",
+                    "onnx_path": str(tmp_path / "model.onnx"),
+                    "engine_path": str(tmp_path / "model.bf16.trt"),
                     "precision": "bf16",
                 },
             },
@@ -148,13 +148,13 @@ class TestRunTypes:
         assert resp.status_code == 201
         assert resp.json()["run_type"] == "tensorrt_build"
 
-    def test_create_benchmark_run(self, client, project_id):
+    def test_create_benchmark_run(self, client, project_id, tmp_path):
         resp = client.post(
             f"/api/runs?project_id={project_id}",
             json={
                 "run_type": "benchmark",
                 "config": {
-                    "model_path": "/test/model",
+                    "model_path": str(tmp_path / "model"),
                     "embodiment_tag": "new_embodiment",
                     "num_iterations": 50,
                 },
@@ -169,13 +169,13 @@ class TestBenchmarkMetrics:
         resp = client.get("/api/runs/nonexistent/benchmark-metrics")
         assert resp.status_code == 404
 
-    def test_benchmark_metrics_empty(self, client, project_id):
+    def test_benchmark_metrics_empty(self, client, project_id, tmp_path):
         # Create a benchmark run
         resp = client.post(
             f"/api/runs?project_id={project_id}",
             json={
                 "run_type": "benchmark",
-                "config": {"model_path": "/test", "embodiment_tag": "new_embodiment"},
+                "config": {"model_path": str(tmp_path / "model"), "embodiment_tag": "new_embodiment"},
             },
         )
         run_id = resp.json()["id"]

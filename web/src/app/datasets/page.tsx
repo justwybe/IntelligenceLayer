@@ -21,6 +21,14 @@ export default function DatasetsPage() {
     <div className="p-6 space-y-6">
       <h1 className="text-[22px] font-bold text-wybe-text-bright">Datasets</h1>
 
+      {!projectId && (
+        <div className="bg-wybe-bg-secondary border border-wybe-border rounded-xl p-6 text-center">
+          <p className="text-sm text-wybe-text-muted">
+            Select a project from the header to get started.
+          </p>
+        </div>
+      )}
+
       {/* Tab bar */}
       <div className="flex gap-1 border-b border-wybe-border">
         {TABS.map((tab) => (
@@ -72,6 +80,10 @@ export default function DatasetsPage() {
 
       {activeTab === "Synth / Mimic" && (
         <div className="space-y-8">
+          <Section title="GR00T-Mimic Data Generation">
+            <MimicStub />
+          </Section>
+
           <Section title="Convert LeRobot v3 Dataset">
             <ConvertDatasetForm projectId={projectId} />
           </Section>
@@ -107,6 +119,63 @@ function Section({
         {title}
       </h2>
       {children}
+    </div>
+  );
+}
+
+function MimicStub() {
+  const [env, setEnv] = useState("GR00T-Mimic-Cube-v0");
+  const [numDemos, setNumDemos] = useState(10);
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-medium bg-wybe-warning/20 text-wybe-warning px-2 py-0.5 rounded">
+          Coming Soon
+        </span>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className="block text-xs text-wybe-text-muted mb-1">Environment</label>
+          <select
+            value={env}
+            onChange={(e) => setEnv(e.target.value)}
+            className="w-full bg-wybe-bg-tertiary border border-wybe-border rounded px-3 py-1.5 text-sm text-wybe-text focus:outline-none focus:border-wybe-accent"
+          >
+            {[
+              "GR00T-Mimic-Cube-v0",
+              "GR00T-Mimic-PickPlace-v0",
+              "GR00T-Mimic-Stack-v0",
+              "GR00T-Mimic-Kitchen-v0",
+              "GR00T-Mimic-Drawer-v0",
+            ].map((e) => (
+              <option key={e} value={e}>{e}</option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <label className="block text-xs text-wybe-text-muted mb-1">
+            Num Demos: {numDemos}
+          </label>
+          <input
+            type="range"
+            min={1}
+            max={100}
+            value={numDemos}
+            onChange={(e) => setNumDemos(parseInt(e.target.value))}
+            className="w-full accent-wybe-accent"
+          />
+        </div>
+      </div>
+      <button
+        disabled
+        className="px-4 py-1.5 bg-wybe-accent text-wybe-bg-primary text-sm font-medium rounded opacity-50 cursor-not-allowed"
+      >
+        Generate Demos
+      </button>
+      <p className="text-xs text-wybe-text-muted">
+        GR00T-Mimic synthetic data generation is not yet available.
+      </p>
     </div>
   );
 }

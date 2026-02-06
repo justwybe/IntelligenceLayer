@@ -111,7 +111,8 @@ class TestInspect:
             "/api/datasets/inspect",
             json={"dataset_path": "/nonexistent/path"},
         )
-        assert resp.status_code == 404
+        # Path validation rejects paths outside allowed roots before checking existence
+        assert resp.status_code == 400
 
     def test_inspect_empty_dataset(self, client, tmp_path):
         ds_path = str(tmp_path / "empty_ds")

@@ -147,6 +147,15 @@ class TaskRunner:
         except Exception:
             logger.exception("Failed to log activity for run %s", run_id)
 
+        # Post-completion hooks
+        if status == "completed":
+            try:
+                run = run or self.store.get_run(run_id)
+                if run:
+                    self._on_run_completed(run, info.log_path)
+            except Exception:
+                logger.exception("Post-completion hook failed for run %s", run_id)
+
         # Remove from in-memory dict to prevent unbounded growth
         with self._lock:
             self._processes.pop(run_id, None)
@@ -167,6 +176,61 @@ class TaskRunner:
         except FileNotFoundError:
             pass
         return metrics
+
+    def _on_run_completed(self, run: dict, log_path: Path) -> None:
+        """Run post-completion hooks based on run type."""
+        import json as _json
+
+        run_type = run.get("run_type", "")
+        project_id = run.get("project_id")
+        config_raw = run.get("config", "{}")
+        config = _json.loads(config_raw) if isinstance(config_raw, str) else config_raw
+
+        if run_type == "conversion" and project_id:
+            # Auto-register the converted dataset
+            output_dir = config.get("output_dir", "")
+            repo_id = config.get("repo_id", "")
+            if output_dir:
+                name = repo_id.replace("/", "_") if repo_id else Path(output_dir).name
+                try:
+                    self.store.register_dataset(
+                        project_id=project_id,
+                        name=name,
+                        path=output_dir,
+                        source="converted",
+                    )
+                    logger.info("Auto-registered converted dataset: %s", output_dir)
+                except Exception:
+                    logger.exception("Failed to auto-register dataset for run %s", run["id"])
+
+        elif run_type == "benchmark" and project_id:
+            # Auto-save benchmark evaluation record
+            try:
+                log_text = log_path.read_text(errors="replace")
+                # Parse benchmark table for metrics
+                metrics: dict = {}
+                for line in log_text.splitlines():
+                    if "E2E" in line and "|" in line and "Device" in line:
+                        continue
+                    if line.strip().startswith("|") and "E2E" not in line:
+                        cells = [c.strip() for c in line.strip("|").split("|")]
+                        if len(cells) >= 6:
+                            try:
+                                metrics["e2e_ms"] = float(cells[-2].replace("ms", "").strip())
+                                metrics["frequency_hz"] = float(cells[-1].replace("Hz", "").strip())
+                            except (ValueError, IndexError):
+                                pass
+                if metrics:
+                    model_id = config.get("model_id", "")
+                    self.store.save_evaluation(
+                        run_id=run["id"],
+                        model_id=model_id,
+                        eval_type="benchmark",
+                        metrics=metrics,
+                    )
+                    logger.info("Auto-saved benchmark evaluation for run %s", run["id"])
+            except Exception:
+                logger.exception("Failed to auto-save benchmark eval for run %s", run["id"])
 
     # -- stopping --------------------------------------------------------------
 

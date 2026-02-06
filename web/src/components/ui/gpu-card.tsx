@@ -39,6 +39,9 @@ export function GpuCard({ gpu, index }: { gpu: GPUInfo; index: number }) {
       ? (gpu.memory_used_mb / gpu.memory_total_mb) * 100
       : 0;
 
+  // Estimate power percentage (typical max TDP ~350W for datacenter GPUs)
+  const powerPct = gpu.power_w > 0 ? Math.min((gpu.power_w / 350) * 100, 100) : 0;
+
   return (
     <div className="bg-wybe-bg-secondary border border-wybe-border rounded-lg p-3 mb-2">
       <div className="text-[13px] font-semibold text-wybe-text mb-2">
@@ -59,6 +62,13 @@ export function GpuCard({ gpu, index }: { gpu: GPUInfo; index: number }) {
         pct={gpu.temperature_c}
         detail={`${gpu.temperature_c.toFixed(0)}\u00b0C`}
       />
+      {gpu.power_w > 0 && (
+        <BarRow
+          label="Power"
+          pct={powerPct}
+          detail={`${gpu.power_w.toFixed(0)}W`}
+        />
+      )}
     </div>
   );
 }

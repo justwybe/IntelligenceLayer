@@ -72,14 +72,14 @@ class TestArtifacts:
 
 
 class TestSimulationRunType:
-    def test_simulation_run_type(self, client, project_id):
+    def test_simulation_run_type(self, client, project_id, tmp_path):
         resp = client.post(
             f"/api/runs?project_id={project_id}",
             json={
                 "run_type": "simulation",
                 "config": {
                     "task": "libero/libero_panda/KITCHEN_SCENE1_open_the_bottom_drawer_of_the_cabinet",
-                    "model_path": "/tmp/test_model",
+                    "model_path": str(tmp_path / "test_model"),
                     "max_steps": 504,
                     "n_action_steps": 8,
                     "n_episodes": 10,
@@ -92,14 +92,14 @@ class TestSimulationRunType:
         data = resp.json()
         assert data["run_type"] == "simulation"
 
-    def test_evaluation_run_type(self, client, project_id):
+    def test_evaluation_run_type(self, client, project_id, tmp_path):
         resp = client.post(
             f"/api/runs?project_id={project_id}",
             json={
                 "run_type": "evaluation",
                 "config": {
-                    "dataset_path": "demo_data/cube_to_bowl_5/",
-                    "model_path": "/tmp/test_model",
+                    "dataset_path": str(tmp_path / "cube_to_bowl_5"),
+                    "model_path": str(tmp_path / "test_model"),
                     "embodiment_tag": "new_embodiment",
                     "traj_ids": "0",
                     "steps": 200,

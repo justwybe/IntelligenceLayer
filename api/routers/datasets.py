@@ -10,7 +10,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import FileResponse
 
 from api.auth import require_auth, verify_ws_token
-from api.deps import get_project_root, get_store
+from api.deps import get_project_root, get_store, validate_path_param
 from api.schemas.datasets import (
     ConstantsResponse,
     DatasetCreate,
@@ -56,6 +56,7 @@ async def create_dataset(
     project_id: str = Query(...),
     store=Depends(get_store),
 ) -> DatasetResponse:
+    validate_path_param(body.path)
     episode_count = _count_episodes(body.path)
     did = store.register_dataset(
         project_id=project_id,
@@ -90,6 +91,7 @@ async def serve_video(
     if not verify_ws_token(token):
         raise HTTPException(status_code=401, detail="Invalid token")
 
+    validate_path_param(path, must_exist=True)
     video_path = Path(path)
     if not video_path.exists() or not video_path.is_file():
         raise HTTPException(status_code=404, detail="Video not found")
@@ -148,6 +150,7 @@ async def delete_dataset(dataset_id: str, store=Depends(get_store)):
 
 @router.post("/inspect", response_model=InspectResponse, dependencies=_auth)
 async def inspect_dataset(body: InspectRequest) -> InspectResponse:
+    validate_path_param(body.dataset_path, must_exist=True)
     p = Path(body.dataset_path)
     if not p.exists():
         raise HTTPException(status_code=404, detail=f"Path not found: {body.dataset_path}")
@@ -189,6 +192,7 @@ async def inspect_dataset(body: InspectRequest) -> InspectResponse:
 
 @router.post("/episode", response_model=EpisodeDataResponse, dependencies=_auth)
 async def get_episode_data(body: EpisodeRequest) -> EpisodeDataResponse:
+    validate_path_param(body.dataset_path, must_exist=True)
     p = Path(body.dataset_path)
     if not p.exists():
         raise HTTPException(status_code=404, detail=f"Dataset path not found: {body.dataset_path}")
