@@ -15,16 +15,16 @@ apt-get update && apt-get install -y \
 # Python 3.10 headers (PPA usually already present from setup_production.sh)
 apt-get install -y python3.10-dev 2>/dev/null || true
 
-# EGL ICD
-mkdir -p /usr/share/glvnd/egl_vendor.d
-echo '{"file_format_version":"1.0.0","ICD":{"library_path":"libEGL_nvidia.so.0"}}' > /usr/share/glvnd/egl_vendor.d/10_nvidia.json
+# EGL ICD (may fail on read-only filesystems — already present from setup_production.sh)
+mkdir -p /usr/share/glvnd/egl_vendor.d 2>/dev/null || true
+echo '{"file_format_version":"1.0.0","ICD":{"library_path":"libEGL_nvidia.so.0"}}' > /usr/share/glvnd/egl_vendor.d/10_nvidia.json 2>/dev/null || true
 
 # Vulkan ICD
-mkdir -p /usr/share/vulkan/icd.d
-echo '{"file_format_version":"1.0.0","ICD":{"library_path":"libGLX_nvidia.so.0","api_version":"1.2.140"}}' > /usr/share/vulkan/icd.d/nvidia_icd.json
+mkdir -p /usr/share/vulkan/icd.d 2>/dev/null || true
+echo '{"file_format_version":"1.0.0","ICD":{"library_path":"libGLX_nvidia.so.0","api_version":"1.2.140"}}' > /usr/share/vulkan/icd.d/nvidia_icd.json 2>/dev/null || true
 
-# Isaac Sim
-pip install isaacsim==5.1.0.0
+# Isaac Sim (optional — may fail if system Python 3.11 is not available)
+pip install isaacsim==5.1.0.0 2>/dev/null || true
 
 # Load env vars
 cd "$PROJECT_DIR"
