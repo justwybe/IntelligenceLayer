@@ -295,6 +295,10 @@ class WorkspaceStore:
         ).fetchone()
         return self._row_to_dict(row)
 
+    def delete_dataset(self, dataset_id: str) -> None:
+        with self._transaction():
+            self._conn.execute("DELETE FROM datasets WHERE id = ?", (dataset_id,))
+
     # -- runs ------------------------------------------------------------------
 
     def create_run(

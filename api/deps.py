@@ -27,3 +27,8 @@ def get_server_manager(request: Request):
 def get_agent(request: Request):
     """Return the shared WybeAgent instance."""
     return request.app.state.agent
+
+
+def get_project_root(request: Request) -> str:
+    """Return the project root path."""
+    return request.app.state.project_root

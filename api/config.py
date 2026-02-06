@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     ]
     gpu_broadcast_interval: int = 10
 
-    model_config = {"env_file": ".env", "env_file_encoding": "utf-8"}
+    model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
     def ensure_api_key(self) -> str:
         """Return existing key or auto-generate one and write to .env."""

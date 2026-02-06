@@ -44,3 +44,64 @@ export interface HealthInfo {
   db_ok: boolean;
   uptime_seconds: number;
 }
+
+// ── Datasets ────────────────────────────────────────────────────────
+
+export interface Dataset {
+  id: string;
+  project_id: string | null;
+  name: string;
+  path: string;
+  source: string | null;
+  parent_dataset_id: string | null;
+  episode_count: number | null;
+  created_at: string;
+  metadata: string | null;
+}
+
+export interface TrajectoryTrace {
+  name: string;
+  y: number[];
+}
+
+export interface EpisodeData {
+  video_path: string | null;
+  state_traces: TrajectoryTrace[];
+  action_traces: TrajectoryTrace[];
+  task_description: string;
+}
+
+export interface InspectResult {
+  info: string;
+  modality: string;
+  tasks: string;
+  stats: string;
+}
+
+export interface DatasetConstants {
+  embodiment_choices: string[];
+  mimic_envs: string[];
+  source_options: string[];
+}
+
+// ── Runs ────────────────────────────────────────────────────────────
+
+export interface Run {
+  id: string;
+  project_id: string | null;
+  run_type: string;
+  dataset_id: string | null;
+  model_id: string | null;
+  config: string;
+  status: string;
+  started_at: string | null;
+  completed_at: string | null;
+  log_path: string | null;
+  metrics: string | null;
+  pid: number | null;
+}
+
+export interface RunStatus {
+  status: string;
+  log_tail: string;
+}

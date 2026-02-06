@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 from api.config import settings
-from api.routers import activity, gpu, health, projects, server
+from api.routers import activity, datasets, gpu, health, projects, runs, server
 from api.ws.gpu import gpu_manager, router as gpu_ws_router
 
 logger = logging.getLogger(__name__)
@@ -92,6 +92,7 @@ async def lifespan(app: FastAPI):
     app.state.server_manager = server_manager
     app.state.task_runner = task_runner
     app.state.agent = agent
+    app.state.project_root = PROJECT_ROOT
     app.state.start_time = time.time()
 
     # Start GPU broadcast background task
@@ -131,6 +132,8 @@ app.include_router(projects.router)
 app.include_router(gpu.router)
 app.include_router(activity.router)
 app.include_router(server.router)
+app.include_router(datasets.router)
+app.include_router(runs.router)
 
 # WebSocket router
 app.include_router(gpu_ws_router)

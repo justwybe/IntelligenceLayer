@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import os
-import tempfile
 
 import pytest
 from fastapi.testclient import TestClient
@@ -35,11 +34,13 @@ def _app(tmp_path, api_key):
 
 @pytest.fixture()
 def client(_app, api_key) -> TestClient:
-    """TestClient with valid auth header."""
-    return TestClient(_app, headers={"Authorization": f"Bearer {api_key}"})
+    """TestClient with valid auth header, lifespan started."""
+    with TestClient(_app, headers={"Authorization": f"Bearer {api_key}"}) as c:
+        yield c
 
 
 @pytest.fixture()
 def unauth_client(_app) -> TestClient:
-    """TestClient without auth header."""
-    return TestClient(_app)
+    """TestClient without auth header, lifespan started."""
+    with TestClient(_app) as c:
+        yield c
