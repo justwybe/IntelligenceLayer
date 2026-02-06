@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 from api.config import settings
-from api.routers import activity, datasets, evaluations, gpu, health, models, projects, runs, server, simulation, training
+from api.routers import activity, chat, datasets, evaluations, gpu, health, models, projects, runs, server, simulation, training
 from api.ws.gpu import gpu_manager, router as gpu_ws_router
 
 logger = logging.getLogger(__name__)
@@ -126,6 +126,7 @@ app.add_middleware(
 
 # REST routers
 app.include_router(health.router)
+app.include_router(chat.router)
 app.include_router(projects.router)
 app.include_router(gpu.router)
 app.include_router(activity.router)

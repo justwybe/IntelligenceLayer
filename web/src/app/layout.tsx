@@ -5,6 +5,7 @@ import { Providers } from "@/components/providers";
 import { ShellBar } from "@/components/shell-bar";
 import { PipelineNav } from "@/components/pipeline-nav";
 import { DashboardSidebar } from "@/components/dashboard-sidebar";
+import { AssistantPanel } from "@/components/assistant-panel";
 
 import "./globals.css";
 
@@ -38,6 +39,7 @@ export default function RootLayout({
           <PipelineNav />
           <main className="min-h-[calc(100vh-7rem)]">{children}</main>
           <DashboardSidebar />
+          <AssistantPanel />
         </Providers>
       </body>
     </html>
