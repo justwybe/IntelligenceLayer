@@ -162,3 +162,50 @@ export interface Model {
   created_at: string;
   notes: string | null;
 }
+
+// ── Simulation ──────────────────────────────────────────────────────
+
+export interface SimulationConstants {
+  sim_tasks: Record<string, string[]>;
+  embodiment_choices: string[];
+}
+
+export interface SimMetric {
+  name: string;
+  value: string;
+}
+
+export interface EvalMetric {
+  trajectory: number;
+  mse: number;
+  mae: number;
+}
+
+export interface EvalMetrics {
+  sim_metrics: SimMetric[];
+  eval_metrics: EvalMetric[];
+}
+
+export interface Artifact {
+  filename: string;
+  url: string;
+}
+
+// ── Evaluations ─────────────────────────────────────────────────────
+
+export interface Evaluation {
+  id: string;
+  run_id: string;
+  model_id: string | null;
+  eval_type: string;
+  metrics: string | null;
+  artifacts: string | null;
+  created_at: string;
+}
+
+export interface CompareEntry {
+  model_name: string;
+  model_id: string;
+  eval_type: string;
+  metrics: Record<string, number | string>;
+}

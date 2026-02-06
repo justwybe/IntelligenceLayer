@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import glob as glob_mod
 import json
 import logging
 import os
@@ -9,10 +10,18 @@ import re
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import FileResponse
 
 from api.auth import require_auth
 from api.deps import get_project_root, get_store, get_task_runner
 from api.schemas.datasets import RunCreate, RunList, RunResponse, RunStatusResponse
+from api.schemas.simulation import (
+    ArtifactItem,
+    ArtifactList,
+    EvalMetric,
+    EvalMetricsResponse,
+    SimMetric,
+)
 from api.schemas.training import (
     CheckpointInfo,
     LossPoint,
@@ -64,6 +73,12 @@ def _build_cmd(run_type: str, config: dict, project_root: str) -> list[str]:
     if run_type == "training":
         return _build_training_cmd(config, venv_python)
 
+    if run_type == "simulation":
+        return _build_simulation_cmd(config, venv_python)
+
+    if run_type == "evaluation":
+        return _build_evaluation_cmd(config, venv_python)
+
     if run_type == "rl_training":
         raise HTTPException(
             status_code=400,
@@ -71,6 +86,110 @@ def _build_cmd(run_type: str, config: dict, project_root: str) -> list[str]:
         )
 
     raise HTTPException(status_code=400, detail=f"Unknown run type: {run_type}")
+
+
+def _build_simulation_cmd(config: dict, venv_python: str) -> list[str]:
+    """Build Isaac Sim rollout command from config dict.
+
+    Port of frontend/pages/simulation.py:launch_sim().
+    """
+    task = config.get("task", "")
+    model_path = config.get("model_path", "")
+    if "|" in model_path:
+        model_path = model_path.split("|")[-1].strip()
+
+    cmd = [
+        venv_python, "-m", "gr00t.eval.rollout_policy",
+        "--env_name", task,
+        "--max_episode_steps", str(int(config.get("max_steps", 504))),
+        "--n_action_steps", str(int(config.get("n_action_steps", 8))),
+        "--n_episodes", str(int(config.get("n_episodes", 10))),
+        "--n_envs", str(int(config.get("n_envs", 1))),
+    ]
+
+    use_server = config.get("use_server", False)
+    if use_server:
+        cmd.extend([
+            "--policy_client_host", config.get("server_host", "localhost"),
+            "--policy_client_port", str(int(config.get("server_port", 5555))),
+        ])
+    elif model_path.strip():
+        cmd.extend(["--model_path", model_path.strip()])
+
+    return cmd
+
+
+def _build_evaluation_cmd(config: dict, venv_python: str) -> list[str]:
+    """Build open-loop eval command from config dict.
+
+    Port of frontend/pages/simulation.py:launch_open_loop().
+    """
+    dataset_path = config.get("dataset_path", "")
+    model_path = config.get("model_path", "")
+    if "|" in model_path:
+        model_path = model_path.split("|")[-1].strip()
+
+    embodiment = config.get("embodiment_tag", "new_embodiment")
+    save_plot_path = config.get("save_plot_path", "")
+
+    cmd = [
+        venv_python, "-m", "gr00t.eval.open_loop_eval",
+        "--dataset_path", dataset_path,
+        "--embodiment_tag", embodiment,
+        "--steps", str(int(config.get("steps", 200))),
+        "--action_horizon", str(int(config.get("action_horizon", 16))),
+    ]
+
+    if save_plot_path:
+        cmd.extend(["--save_plot_path", save_plot_path])
+
+    # Trajectory IDs
+    traj_ids_str = config.get("traj_ids", "0")
+    try:
+        ids = [int(x.strip()) for x in str(traj_ids_str).split(",") if x.strip()]
+        for tid in ids:
+            cmd.extend(["--traj_ids", str(tid)])
+    except ValueError:
+        pass
+
+    if model_path.strip():
+        cmd.extend(["--model_path", model_path.strip()])
+
+    return cmd
+
+
+def _get_eval_output_dir(run_id: str) -> str:
+    """Return the eval output directory for a run."""
+    base = os.path.join(
+        os.environ.get("WYBE_DATA_DIR", os.path.expanduser("~/.wybe_studio")),
+        "eval_outputs",
+    )
+    return os.path.join(base, run_id)
+
+
+def _parse_eval_metrics(log_text: str) -> EvalMetricsResponse:
+    """Parse evaluation log text into structured metrics."""
+    sim_metrics: list[SimMetric] = []
+    eval_metrics: list[EvalMetric] = []
+
+    m = re.search(r"success rate:\s*([\d.]+)", log_text)
+    if m:
+        sim_metrics.append(SimMetric(name="Success Rate", value=m.group(1)))
+
+    m = re.search(r"Collecting \d+ episodes took ([\d.]+) seconds", log_text)
+    if m:
+        sim_metrics.append(SimMetric(name="Total Time (s)", value=m.group(1)))
+
+    for line in log_text.splitlines():
+        m = re.search(r"MSE for trajectory (\d+): ([\d.e+-]+), MAE: ([\d.e+-]+)", line)
+        if m:
+            eval_metrics.append(EvalMetric(
+                trajectory=int(m.group(1)),
+                mse=float(m.group(2)),
+                mae=float(m.group(3)),
+            ))
+
+    return EvalMetricsResponse(sim_metrics=sim_metrics, eval_metrics=eval_metrics)
 
 
 def _build_training_cmd(config: dict, venv_python: str) -> list[str]:
@@ -241,16 +360,28 @@ async def create_run(
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
 
+    # For evaluation runs, inject save_plot_path into config
+    config = dict(body.config)
+    if body.run_type == "evaluation":
+        save_dir = _get_eval_output_dir("")  # we need run_id first
+        # We'll set it after creating the run
+
     # Create the run record
     run_id = store.create_run(
         project_id=project_id,
         run_type=body.run_type,
-        config=body.config,
+        config=config,
         dataset_id=body.dataset_id,
     )
 
+    # For evaluation runs, create output dir and set save_plot_path
+    if body.run_type == "evaluation":
+        save_dir = _get_eval_output_dir(run_id)
+        os.makedirs(save_dir, exist_ok=True)
+        config["save_plot_path"] = os.path.join(save_dir, "traj.jpeg")
+
     # Build command and launch
-    cmd = _build_cmd(body.run_type, body.config, project_root)
+    cmd = _build_cmd(body.run_type, config, project_root)
     task_runner.launch(run_id, cmd, cwd=project_root)
 
     run = store.get_run(run_id)
@@ -316,3 +447,60 @@ async def stop_run(
         raise HTTPException(status_code=404, detail="Run not found")
     msg = task_runner.stop(run_id)
     return {"message": msg}
+
+
+@router.get("/{run_id}/eval-metrics", response_model=EvalMetricsResponse)
+async def get_eval_metrics(
+    run_id: str,
+    store=Depends(get_store),
+    task_runner=Depends(get_task_runner),
+) -> EvalMetricsResponse:
+    run = store.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    log_text = task_runner.tail_log(run_id, 500)
+    return _parse_eval_metrics(log_text)
+
+
+@router.get("/{run_id}/artifacts", response_model=ArtifactList)
+async def list_artifacts(
+    run_id: str,
+    store=Depends(get_store),
+) -> ArtifactList:
+    run = store.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    output_dir = _get_eval_output_dir(run_id)
+    items: list[ArtifactItem] = []
+    if os.path.isdir(output_dir):
+        for ext in ("*.jpeg", "*.jpg", "*.png"):
+            for fpath in sorted(glob_mod.glob(os.path.join(output_dir, ext))):
+                fname = os.path.basename(fpath)
+                items.append(ArtifactItem(
+                    filename=fname,
+                    url=f"/api/runs/{run_id}/artifacts/{fname}",
+                ))
+    return ArtifactList(artifacts=items)
+
+
+@router.get("/{run_id}/artifacts/{filename}")
+async def get_artifact(
+    run_id: str,
+    filename: str,
+    store=Depends(get_store),
+):
+    run = store.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+
+    # Prevent path traversal
+    safe_name = Path(filename).name
+    if safe_name != filename or ".." in filename:
+        raise HTTPException(status_code=400, detail="Invalid filename")
+
+    output_dir = _get_eval_output_dir(run_id)
+    file_path = os.path.join(output_dir, safe_name)
+    if not os.path.isfile(file_path):
+        raise HTTPException(status_code=404, detail="Artifact not found")
+
+    return FileResponse(file_path)
