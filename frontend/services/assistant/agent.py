@@ -52,7 +52,7 @@ class WybeAgent:
         self.task_runner = task_runner
         self.server_manager = server_manager
         self.project_root = project_root
-        self.model = model or os.environ.get("WYBE_ASSISTANT_MODEL", "claude-sonnet-4-20250514")
+        self.model = model or os.environ.get("WYBE_ASSISTANT_MODEL", "claude-opus-4-6")
         self.sessions = SessionManager()
         self.tools = ToolRegistry()
         self._register_all_tools()
