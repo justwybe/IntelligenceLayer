@@ -163,6 +163,30 @@ export interface Model {
   notes: string | null;
 }
 
+export interface ModelsConstants {
+  embodiment_choices: string[];
+}
+
+export interface BenchmarkRow {
+  device: string;
+  mode: string;
+  data_processing: string;
+  backbone: string;
+  action_head: string;
+  e2e: string;
+  frequency: string;
+}
+
+export interface BenchmarkMetrics {
+  rows: BenchmarkRow[];
+  status: string;
+}
+
+export interface DeployResponse {
+  message: string;
+  status: string;
+}
+
 // ── Simulation ──────────────────────────────────────────────────────
 
 export interface SimulationConstants {

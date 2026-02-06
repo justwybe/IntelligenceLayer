@@ -1,4 +1,4 @@
-"""Model registry endpoints — list, register, get."""
+"""Model registry endpoints — list, register, get, constants."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 
 from api.auth import require_auth
 from api.deps import get_store
+from api.schemas.models import ModelsConstantsResponse
 from api.schemas.training import ModelCreate, ModelList, ModelResponse
 
 router = APIRouter(
@@ -13,6 +14,13 @@ router = APIRouter(
     tags=["models"],
     dependencies=[Depends(require_auth)],
 )
+
+
+@router.get("/constants", response_model=ModelsConstantsResponse)
+async def models_constants() -> ModelsConstantsResponse:
+    from frontend.constants import EMBODIMENT_CHOICES
+
+    return ModelsConstantsResponse(embodiment_choices=EMBODIMENT_CHOICES)
 
 
 @router.get("", response_model=ModelList)

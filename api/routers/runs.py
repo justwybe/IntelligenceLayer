@@ -15,6 +15,7 @@ from fastapi.responses import FileResponse
 from api.auth import require_auth
 from api.deps import get_project_root, get_store, get_task_runner
 from api.schemas.datasets import RunCreate, RunList, RunResponse, RunStatusResponse
+from api.schemas.models import BenchmarkMetricsResponse, BenchmarkRow
 from api.schemas.simulation import (
     ArtifactItem,
     ArtifactList,
@@ -78,6 +79,15 @@ def _build_cmd(run_type: str, config: dict, project_root: str) -> list[str]:
 
     if run_type == "evaluation":
         return _build_evaluation_cmd(config, venv_python)
+
+    if run_type == "onnx_export":
+        return _build_onnx_export_cmd(config, venv_python)
+
+    if run_type == "tensorrt_build":
+        return _build_tensorrt_cmd(config, venv_python)
+
+    if run_type == "benchmark":
+        return _build_benchmark_cmd(config, venv_python)
 
     if run_type == "rl_training":
         raise HTTPException(
@@ -156,6 +166,96 @@ def _build_evaluation_cmd(config: dict, venv_python: str) -> list[str]:
         cmd.extend(["--model_path", model_path.strip()])
 
     return cmd
+
+
+def _build_onnx_export_cmd(config: dict, venv_python: str) -> list[str]:
+    """Build ONNX export command from config dict."""
+    model_path = config.get("model_path", "")
+    dataset_path = config.get("dataset_path", "")
+    embodiment = config.get("embodiment_tag", "new_embodiment")
+    output_dir = config.get("output_dir", "")
+
+    return [
+        venv_python, "scripts/deployment/export_onnx_n1d6.py",
+        "--model_path", model_path,
+        "--dataset_path", dataset_path,
+        "--embodiment_tag", embodiment,
+        "--output_dir", output_dir,
+    ]
+
+
+def _build_tensorrt_cmd(config: dict, venv_python: str) -> list[str]:
+    """Build TensorRT engine build command from config dict."""
+    onnx_path = config.get("onnx_path", "")
+    engine_path = config.get("engine_path", "")
+    precision = config.get("precision", "bf16")
+
+    return [
+        venv_python, "scripts/deployment/build_tensorrt_engine.py",
+        "--onnx", onnx_path,
+        "--engine", engine_path,
+        "--precision", precision,
+    ]
+
+
+def _build_benchmark_cmd(config: dict, venv_python: str) -> list[str]:
+    """Build benchmark inference command from config dict."""
+    model_path = config.get("model_path", "")
+    embodiment = config.get("embodiment_tag", "new_embodiment")
+    num_iters = int(config.get("num_iterations", 100))
+
+    cmd = [
+        venv_python, "scripts/deployment/benchmark_inference.py",
+        "--model_path", model_path,
+        "--embodiment_tag", embodiment,
+        "--num_iterations", str(num_iters),
+    ]
+
+    trt_path = config.get("trt_engine_path")
+    if trt_path:
+        cmd.extend(["--trt_engine_path", trt_path])
+
+    if config.get("skip_compile"):
+        cmd.append("--skip_compile")
+
+    return cmd
+
+
+def _parse_benchmark_table(log_text: str) -> list[BenchmarkRow]:
+    """Parse benchmark log output into structured rows.
+
+    Port of frontend/pages/models.py:_parse_benchmark_table().
+    """
+    results: list[BenchmarkRow] = []
+    lines = log_text.splitlines()
+    header_idx = None
+    for i, line in enumerate(lines):
+        if "Device" in line and "Mode" in line and "E2E" in line and "|" in line:
+            header_idx = i
+            break
+    if header_idx is None:
+        return results
+    header_line = lines[header_idx]
+    headers = [h.strip() for h in header_line.strip().strip("|").split("|")]
+    for line in lines[header_idx + 2:]:
+        line = line.strip()
+        if not line or not line.startswith("|"):
+            break
+        cells = [c.strip() for c in line.strip("|").split("|")]
+        if len(cells) >= len(headers):
+            row_dict = {}
+            for j, h in enumerate(headers):
+                row_dict[h] = cells[j] if j < len(cells) else ""
+            results.append(BenchmarkRow(
+                device=row_dict.get("Device", ""),
+                mode=row_dict.get("Mode", ""),
+                data_processing=row_dict.get("Data Processing", ""),
+                backbone=row_dict.get("Backbone", ""),
+                action_head=row_dict.get("Action Head", ""),
+                e2e=row_dict.get("E2E", ""),
+                frequency=row_dict.get("Frequency", ""),
+            ))
+    return results
 
 
 def _get_eval_output_dir(run_id: str) -> str:
@@ -460,6 +560,21 @@ async def get_eval_metrics(
         raise HTTPException(status_code=404, detail="Run not found")
     log_text = task_runner.tail_log(run_id, 500)
     return _parse_eval_metrics(log_text)
+
+
+@router.get("/{run_id}/benchmark-metrics", response_model=BenchmarkMetricsResponse)
+async def get_benchmark_metrics(
+    run_id: str,
+    store=Depends(get_store),
+    task_runner=Depends(get_task_runner),
+) -> BenchmarkMetricsResponse:
+    run = store.get_run(run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Run not found")
+    status = task_runner.status(run_id)
+    log_text = task_runner.tail_log(run_id, 200)
+    rows = _parse_benchmark_table(log_text)
+    return BenchmarkMetricsResponse(rows=rows, status=status)
 
 
 @router.get("/{run_id}/artifacts", response_model=ArtifactList)

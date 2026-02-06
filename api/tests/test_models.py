@@ -68,6 +68,124 @@ class TestModelsCRUD:
         assert resp.status_code == 404
 
 
+class TestModelsConstants:
+    def test_get_constants(self, client):
+        resp = client.get("/api/models/constants")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "embodiment_choices" in data
+        assert isinstance(data["embodiment_choices"], list)
+        assert "new_embodiment" in data["embodiment_choices"]
+
+    def test_constants_requires_auth(self, unauth_client):
+        resp = unauth_client.get("/api/models/constants")
+        assert resp.status_code == 401
+
+
+class TestServerDeployStop:
+    def test_deploy(self, client):
+        resp = client.post(
+            "/api/server/deploy",
+            json={
+                "model_path": "/test/model",
+                "embodiment_tag": "new_embodiment",
+                "port": 5555,
+            },
+        )
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "message" in data
+        assert "status" in data
+
+    def test_stop(self, client):
+        resp = client.post("/api/server/stop")
+        assert resp.status_code == 200
+        data = resp.json()
+        assert "message" in data
+        assert "status" in data
+
+    def test_deploy_requires_auth(self, unauth_client):
+        resp = unauth_client.post(
+            "/api/server/deploy",
+            json={"model_path": "/test", "embodiment_tag": "new_embodiment"},
+        )
+        assert resp.status_code == 401
+
+    def test_stop_requires_auth(self, unauth_client):
+        resp = unauth_client.post("/api/server/stop")
+        assert resp.status_code == 401
+
+
+class TestRunTypes:
+    def test_create_onnx_export_run(self, client, project_id):
+        resp = client.post(
+            f"/api/runs?project_id={project_id}",
+            json={
+                "run_type": "onnx_export",
+                "config": {
+                    "model_path": "/test/model",
+                    "dataset_path": "/test/dataset",
+                    "embodiment_tag": "new_embodiment",
+                    "output_dir": "/test/output",
+                },
+            },
+        )
+        assert resp.status_code == 201
+        assert resp.json()["run_type"] == "onnx_export"
+
+    def test_create_tensorrt_build_run(self, client, project_id):
+        resp = client.post(
+            f"/api/runs?project_id={project_id}",
+            json={
+                "run_type": "tensorrt_build",
+                "config": {
+                    "onnx_path": "/test/model.onnx",
+                    "engine_path": "/test/model.bf16.trt",
+                    "precision": "bf16",
+                },
+            },
+        )
+        assert resp.status_code == 201
+        assert resp.json()["run_type"] == "tensorrt_build"
+
+    def test_create_benchmark_run(self, client, project_id):
+        resp = client.post(
+            f"/api/runs?project_id={project_id}",
+            json={
+                "run_type": "benchmark",
+                "config": {
+                    "model_path": "/test/model",
+                    "embodiment_tag": "new_embodiment",
+                    "num_iterations": 50,
+                },
+            },
+        )
+        assert resp.status_code == 201
+        assert resp.json()["run_type"] == "benchmark"
+
+
+class TestBenchmarkMetrics:
+    def test_benchmark_metrics_not_found(self, client):
+        resp = client.get("/api/runs/nonexistent/benchmark-metrics")
+        assert resp.status_code == 404
+
+    def test_benchmark_metrics_empty(self, client, project_id):
+        # Create a benchmark run
+        resp = client.post(
+            f"/api/runs?project_id={project_id}",
+            json={
+                "run_type": "benchmark",
+                "config": {"model_path": "/test", "embodiment_tag": "new_embodiment"},
+            },
+        )
+        run_id = resp.json()["id"]
+        resp2 = client.get(f"/api/runs/{run_id}/benchmark-metrics")
+        assert resp2.status_code == 200
+        data = resp2.json()
+        assert "rows" in data
+        assert "status" in data
+
+
 class TestAuth:
     def test_list_requires_auth(self, unauth_client):
         resp = unauth_client.get("/api/models")
