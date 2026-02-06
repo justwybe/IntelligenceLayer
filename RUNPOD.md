@@ -20,7 +20,7 @@ bash scripts/setup_production.sh verify
 git clone https://github.com/justwybe/IntelligenceLayer.git /root/IntelligenceLayer
 cd /root/IntelligenceLayer
 cp .env.example .env
-# Edit .env to add your ANTHROPIC_API_KEY
+bash scripts/set_api_key.sh   # paste your Anthropic API key when prompted
 bash scripts/setup_production.sh all
 ```
 
