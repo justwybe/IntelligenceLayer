@@ -17,7 +17,7 @@ export const useProjectStore = create<ProjectStore>()(
     (set) => ({
       currentProjectId: null,
       sidebarVisible: false,
-      assistantVisible: false,
+      assistantVisible: true,
       setCurrentProjectId: (id) => set({ currentProjectId: id }),
       toggleSidebar: () =>
         set((state) => ({ sidebarVisible: !state.sidebarVisible })),
