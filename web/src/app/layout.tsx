@@ -19,6 +19,8 @@ const jetbrainsMono = JetBrains_Mono({
   subsets: ["latin"],
 });
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Wybe Studio",
   description: "Robot learning pipeline — Datasets, Training, Simulation, Models",
