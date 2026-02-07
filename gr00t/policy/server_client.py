@@ -167,6 +167,7 @@ class PolicyClient(BasePolicy):
     def _init_socket(self):
         """Initialize or reinitialize the socket with current settings"""
         self.socket = self.context.socket(zmq.REQ)
+        self.socket.setsockopt(zmq.LINGER, 0)
         self.socket.setsockopt(zmq.RCVTIMEO, self.timeout_ms)
         self.socket.setsockopt(zmq.SNDTIMEO, self.timeout_ms)
         self.socket.connect(f"tcp://{self.host}:{self.port}")
@@ -206,6 +207,9 @@ class PolicyClient(BasePolicy):
             self.socket.send(MsgSerializer.to_bytes(request))
             message = self.socket.recv()
         except zmq.Again:
+            # REQ socket is stuck in send/recv cycle — recreate it
+            self.socket.close()
+            self._init_socket()
             raise TimeoutError(
                 f"Timeout after {self.timeout_ms}ms waiting for response from {self.host}:{self.port}"
             )
