@@ -644,6 +644,40 @@ footer { display: none !important; }
     color: var(--wybe-text);
 }
 
+/* ── Soul Chat metadata bar ────────────────────────────────── */
+.soul-metadata {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 8px 12px;
+    background: var(--wybe-bg-secondary);
+    border: 1px solid var(--wybe-border);
+    border-radius: var(--wybe-radius-sm);
+    font-size: 12px;
+    color: var(--wybe-text-muted);
+    font-family: var(--wybe-font);
+    flex-wrap: wrap;
+}
+.soul-metadata b {
+    color: var(--wybe-text);
+}
+.soul-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: 600;
+    font-family: var(--wybe-font-mono);
+}
+.soul-badge-haiku {
+    background: rgba(34,197,94,0.15);
+    color: #4ade80;
+}
+.soul-badge-sonnet {
+    background: rgba(168,85,247,0.15);
+    color: #c084fc;
+}
+
 /* ── Responsive ────────────────────────────────────────────── */
 @media (max-width: 1200px) {
     .metric-grid { grid-template-columns: repeat(2, 1fr); }

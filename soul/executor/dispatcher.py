@@ -50,7 +50,15 @@ class Dispatcher:
         self._preferences = preferences
         self._resident_id = resident_id
 
+    @property
+    def speaker(self) -> Speaker:
+        return self._speaker
+
     # -- public API ------------------------------------------------------------
+
+    def speak(self, text: str) -> None:
+        """Convenience: speak text directly via the Speaker."""
+        self._speaker.speak(text)
 
     def execute(self, plan: ActionPlan) -> list[ActionResult]:
         """Execute all actions in *plan* respecting dependency order.

@@ -31,6 +31,7 @@ from frontend.pages.dashboard import create_dashboard_sidebar
 from frontend.pages.datasets import create_datasets_page
 from frontend.pages.models import create_models_page
 from frontend.pages.simulation import create_simulation_page
+from frontend.pages.soul_chat import create_soul_chat_page
 from frontend.pages.training import create_training_page
 from frontend.services.assistant.agent import WybeAgent
 from frontend.services.process_manager import ProcessManager
@@ -42,7 +43,7 @@ from frontend.theme import WYBE_CSS, WybeTheme
 logger = logging.getLogger(__name__)
 
 # Page IDs for routing
-PAGES = ["datasets", "training", "simulation", "models"]
+PAGES = ["datasets", "training", "simulation", "models", "soul_chat"]
 
 
 def _project_choices(store: WorkspaceStore) -> list[str]:
@@ -70,6 +71,16 @@ def create_app() -> gr.Blocks:
         server_manager=server_manager,
         project_root=PROJECT_ROOT,
     )
+
+    # ── Soul System (optional — needs ANTHROPIC_API_KEY) ──
+    soul_loop = None
+    try:
+        from soul.loop import SoulLoop
+
+        soul_loop = SoulLoop()
+        logger.info("Soul System initialized")
+    except Exception:
+        logger.warning("Soul System unavailable (missing deps?)")
 
     with gr.Blocks(title="Wybe Studio") as app:
 
@@ -130,6 +141,9 @@ def create_app() -> gr.Blocks:
 
                     with gr.TabItem("Models", id="models"):
                         models = create_models_page(server_manager, store, task_runner, project_state, PROJECT_ROOT)
+
+                    with gr.TabItem("Talk to Wybe", id="soul_chat"):
+                        soul_chat = create_soul_chat_page(soul_loop)
 
             # Assistant panel (25%)
             with gr.Column(scale=1, elem_classes="assistant-panel"):

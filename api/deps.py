@@ -36,6 +36,11 @@ def get_project_root(request: Request) -> str:
     return request.app.state.project_root
 
 
+def get_soul_loop(request: Request):
+    """Return the shared SoulLoop instance."""
+    return request.app.state.soul_loop
+
+
 def validate_path_param(path: str, *, must_exist: bool = False) -> str:
     """Validate a user-supplied path and return it, or raise 400."""
     error = validate_path(path, must_exist=must_exist)

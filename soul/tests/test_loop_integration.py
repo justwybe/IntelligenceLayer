@@ -115,12 +115,11 @@ class TestSoulLoop:
 
         mock_dispatcher = MagicMock()
         mock_dispatcher.execute.return_value = [MagicMock(success=True), MagicMock(success=True)]
-        mock_dispatcher.speaker = MagicMock()
         soul_loop._dispatcher = mock_dispatcher
 
         result = soul_loop.process_text("Get my glasses")
 
-        mock_dispatcher.speaker.speak.assert_called_once_with("Sure, let me get your glasses!")
+        mock_dispatcher.speak.assert_called_once_with("Sure, let me get your glasses!")
         assert result["actions_executed"] == 2
 
     def test_shutdown(self, soul_loop):

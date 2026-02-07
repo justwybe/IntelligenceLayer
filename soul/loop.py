@@ -80,17 +80,17 @@ class SoulLoop:
 
     def _get_dispatcher(self):
         if self._dispatcher is None:
-            from soul.executor.dispatcher import ActionDispatcher
+            from soul.executor.dispatcher import Dispatcher
             from soul.executor.speak import Speaker
             from soul.executor.navigate import Navigator
             from soul.executor.manipulate import Manipulator
 
-            self._dispatcher = ActionDispatcher(
+            self._dispatcher = Dispatcher(
                 speaker=Speaker(self.config),
                 navigator=Navigator(self.config),
                 manipulator=Manipulator(self.config),
                 preferences=self.preferences,
-                facility=self.facility,
+                resident_id=self._current_resident_id,
             )
         return self._dispatcher
 
@@ -123,7 +123,7 @@ class SoulLoop:
 
         # Speak interim response if available
         if result.interim_response:
-            dispatcher.speaker.speak(result.interim_response)
+            dispatcher.speak(result.interim_response)
 
         # Execute action plan
         t1 = time.monotonic()
