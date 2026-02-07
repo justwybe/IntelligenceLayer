@@ -100,7 +100,6 @@ def create_soul_chat_page(soul_loop: SoulLoop | None) -> dict:
         chatbot = gr.Chatbot(
             value=[{"role": "assistant", "content": GREETING}],
             height=450,
-            type="messages",
             show_label=False,
         )
 
