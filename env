@@ -1,0 +1,59 @@
+# ──────────────────────────────────────────────
+# IntelligenceLayer — Environment Variables
+# Copy this file:  cp .env.example .env
+# ──────────────────────────────────────────────
+
+# ── Logging ──────────────────────────────────
+LOGURU_LEVEL=INFO
+
+# ── GPU / Rendering ─────────────────────────
+MUJOCO_GL=egl
+PYOPENGL_PLATFORM=egl
+CUBLAS_WORKSPACE_CONFIG=:4096:8
+NVIDIA_DRIVER_CAPABILITIES=graphics,utility,compute
+
+# ── Distributed Training (auto-set by torchrun) ──
+# WORLD_SIZE=1
+# LOCAL_RANK=0
+# NUM_GPUS=1
+
+# ── Model Inference ─────────────────────────
+FLASH_ATTENTION_DETERMINISTIC=0          # Set to 1 for reproducibility
+# VIDEO_MAX_PIXELS=                      # Optional — default ~91M pixels
+
+# ── GR00T Experiment Tracking ───────────────
+# GROOT_COMMIT_HASH=                     # Auto-populated for W&B logging
+
+# ── SimplerEnv / ManiSkill2 ─────────────────
+# MS2_ASSET_DIR=                         # Path to ManiSkill2 assets
+# MS2_REAL2SIM_ASSET_DIR=                # Path to Real2Sim assets
+MS2_SIM_LOG_LEVEL=error
+MS2_RENDERER_LOG_LEVEL=warn
+
+# ── LIBERO Benchmark ────────────────────────
+# LIBERO_CONFIG_PATH=~/.libero           # Default: ~/.libero
+
+# ── Library Tweaks ──────────────────────────
+TOKENIZERS_PARALLELISM=false
+XLA_PYTHON_CLIENT_PREALLOCATE=false
+
+# ── Distributed Training (NCCL) ───────────
+# NCCL_DEBUG=WARN
+# NCCL_P2P_DISABLE=0
+
+# ── Memory Optimization ───────────────────
+PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True
+
+# ── Wybe Studio AI Assistant ──────────────
+ANTHROPIC_API_KEY=REDACTED
+# WYBE_ASSISTANT_MODEL=claude-sonnet-4-20250514  # Override assistant model
+
+# ── Wybe Studio API ──────────────────────
+# WYBE_API_KEY=REDACTED
+# ALLOWED_ORIGINS=http://localhost:3000    # Comma-separated CORS origins for custom deployments
+
+# ── WholeBodyControl / Hardware ─────────────
+# GR00T_WBC_TMUX_SESSION=               # Tmux session name for deployment
+# CONTAINER=                             # Set if running inside Docker
+# ROS_LOCALHOST_ONLY=1                   # Restrict ROS2 to localhost
+WYBE_API_KEY=REDACTED
