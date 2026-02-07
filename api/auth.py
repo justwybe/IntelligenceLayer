@@ -18,8 +18,8 @@ async def require_auth(
     Returns the token on success; raises 401 otherwise.
     """
     api_key = settings.wybe_api_key
-    if not api_key:
-        # No key configured — auth disabled (dev mode)
+    if not api_key or api_key == "disabled":
+        # No key configured or explicitly disabled — open access
         return ""
 
     if credentials is None or credentials.credentials != api_key:
@@ -34,6 +34,6 @@ async def require_auth(
 def verify_ws_token(token: str | None) -> bool:
     """Check a WebSocket query-param token."""
     api_key = settings.wybe_api_key
-    if not api_key:
+    if not api_key or api_key == "disabled":
         return True
     return token == api_key

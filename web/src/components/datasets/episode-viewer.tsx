@@ -4,7 +4,7 @@ import { useState } from "react";
 import { useEpisodeData } from "@/hooks/use-datasets";
 import { TrajectoryChart } from "./trajectory-chart";
 
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 function getApiKey(): string {
   if (typeof document === "undefined") return "";

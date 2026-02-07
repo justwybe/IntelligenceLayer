@@ -22,6 +22,15 @@ class Settings(BaseSettings):
 
     model_config = {"env_file": ".env", "env_file_encoding": "utf-8", "extra": "ignore"}
 
+    def get_origins(self) -> list[str]:
+        """Return allowed origins, auto-adding RunPod proxy if on a pod."""
+        origins = list(self.allowed_origins)
+        pod_id = os.environ.get("RUNPOD_POD_ID")
+        if pod_id:
+            origins.append(f"https://{pod_id}-3000.proxy.runpod.net")
+            origins.append(f"https://{pod_id}-8000.proxy.runpod.net")
+        return origins
+
     def ensure_api_key(self) -> str:
         """Return existing key or auto-generate one and write to .env."""
         if self.wybe_api_key:

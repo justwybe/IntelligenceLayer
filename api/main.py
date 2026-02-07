@@ -58,7 +58,7 @@ async def lifespan(app: FastAPI):
     from frontend.services.task_runner import TaskRunner
     from frontend.services.workspace import WorkspaceStore
 
-    if settings.wybe_api_key:
+    if settings.wybe_api_key and settings.wybe_api_key != "disabled":
         logger.info("Auth enabled — API key required")
     else:
         logger.info("Auth disabled — open access")
@@ -118,10 +118,10 @@ app = FastAPI(
     lifespan=lifespan,
 )
 
-# CORS — allow Next.js dev server
+# CORS — allow Next.js dev server + RunPod proxy
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=settings.allowed_origins,
+    allow_origins=settings.get_origins(),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
