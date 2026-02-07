@@ -117,8 +117,6 @@ export function AssistantPanel() {
     if (assistantVisible) inputRef.current?.focus();
   }, [assistantVisible]);
 
-  if (!assistantVisible) return null;
-
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!input.trim()) return;
@@ -128,14 +126,8 @@ export function AssistantPanel() {
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        className="fixed inset-0 z-40"
-        onClick={() => setAssistantVisible(false)}
-      />
-
-      {/* Panel */}
-      <div className="fixed right-0 top-14 w-96 h-[calc(100vh-3.5rem)] bg-wybe-bg-secondary border-l border-wybe-border z-50 flex flex-col shadow-[-4px_0_12px_rgba(0,0,0,0.3)]">
+      {/* Panel — always visible */}
+      <div className="fixed right-0 top-14 w-96 h-[calc(100vh-3.5rem)] bg-wybe-bg-secondary border-l border-wybe-border z-50 flex flex-col">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-3 border-b border-wybe-border">
           <div className="flex items-center gap-2">

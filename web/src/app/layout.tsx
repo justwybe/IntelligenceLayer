@@ -39,7 +39,7 @@ export default function RootLayout({
         <Providers>
           <ShellBar />
           <PipelineNav />
-          <main className="min-h-[calc(100vh-7rem)]">{children}</main>
+          <main className="min-h-[calc(100vh-7rem)] mr-96">{children}</main>
           <DashboardSidebar />
           <AssistantPanel />
         </Providers>

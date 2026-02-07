@@ -8,7 +8,7 @@ import type { Project } from "@/types";
 import { useProjectStore } from "@/stores/project-store";
 
 export function ShellBar() {
-  const { currentProjectId, setCurrentProjectId, toggleSidebar, toggleAssistant } =
+  const { currentProjectId, setCurrentProjectId, toggleSidebar } =
     useProjectStore();
 
   const queryClient = useQueryClient();
@@ -128,14 +128,6 @@ export function ShellBar() {
       </div>
 
       <div className="flex-1" />
-
-      {/* Assistant toggle */}
-      <button
-        onClick={toggleAssistant}
-        className="bg-wybe-accent/10 border border-wybe-accent/30 rounded-lg px-3 py-1.5 text-sm text-wybe-accent hover:bg-wybe-accent/20 transition-colors"
-      >
-        Assistant
-      </button>
 
       {/* Dashboard toggle */}
       <button
