@@ -28,7 +28,7 @@ from dotenv import load_dotenv
 load_dotenv(os.path.join(PROJECT_ROOT, ".env"))
 
 from api.config import settings
-from api.routers import activity, chat, datasets, evaluations, gpu, health, models, projects, runs, server, simulation, soul, training
+from api.routers import activity, chat, datasets, evaluations, gpu, health, models, projects, runs, server, simulation, training
 from api.ws.gpu import gpu_manager, router as gpu_ws_router
 
 logger = logging.getLogger(__name__)
@@ -87,18 +87,7 @@ async def lifespan(app: FastAPI):
     except Exception:
         logger.warning("WybeAgent unavailable (missing anthropic key?)")
 
-    # Soul System (lazy — only if deps available)
-    soul_loop = None
-    try:
-        from soul.loop import SoulLoop
-
-        soul_loop = SoulLoop()
-        logger.info("Soul System initialized")
-    except Exception:
-        logger.warning("Soul System unavailable (missing deps?)")
-
     # Attach to app state for dependency injection
-    app.state.soul_loop = soul_loop
     app.state.store = store
     app.state.process_manager = process_manager
     app.state.server_manager = server_manager
@@ -119,8 +108,6 @@ async def lifespan(app: FastAPI):
         await broadcast_task
     except asyncio.CancelledError:
         pass
-    if soul_loop:
-        soul_loop.shutdown()
     store.close()
     logger.info("Wybe Studio API stopped")
 
@@ -152,7 +139,6 @@ app.include_router(runs.router)
 app.include_router(training.router)
 app.include_router(models.router)
 app.include_router(simulation.router)
-app.include_router(soul.router)
 app.include_router(evaluations.router)
 
 # WebSocket router
