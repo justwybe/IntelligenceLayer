@@ -30,11 +30,11 @@ if ! flock -n 201; then
 fi
 
 # Don't backup during deploys
-if [ -f /tmp/wybe_deploy.lock ] && flock -n 200 /tmp/wybe_deploy.lock 2>/dev/null; then
-    : # lock acquired means no deploy running, continue
-else
-    log "Deploy in progress — skipping backup."
-    exit 0
+if [ -f /tmp/wybe_deploy.lock ]; then
+    if ! flock -n 200 /tmp/wybe_deploy.lock 2>/dev/null; then
+        log "Deploy in progress — skipping backup."
+        exit 0
+    fi
 fi
 
 # Check if there's anything to back up
