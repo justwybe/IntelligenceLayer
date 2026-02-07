@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+import { getApiBase } from "@/lib/api-base";
 
 function getApiKey(): string {
   if (typeof document === "undefined") return "";
@@ -19,7 +19,7 @@ async function request<T>(
     headers["Authorization"] = `Bearer ${key}`;
   }
 
-  const res = await fetch(`${BASE_URL}${path}`, {
+  const res = await fetch(`${getApiBase()}${path}`, {
     ...options,
     headers,
   });

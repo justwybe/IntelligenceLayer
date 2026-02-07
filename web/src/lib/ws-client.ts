@@ -1,18 +1,6 @@
-type MessageHandler = (data: unknown) => void;
+import { getWsBase } from "@/lib/api-base";
 
-function getWsBase(): string {
-  const configured = process.env.NEXT_PUBLIC_WS_URL;
-  if (configured) return configured;
-  if (typeof window === "undefined") return "ws://localhost:8000";
-  const { hostname, protocol } = window.location;
-  if (hostname === "localhost" || hostname === "127.0.0.1") {
-    return "ws://localhost:8000";
-  }
-  // RunPod proxy: swap -3000 to -8000 in hostname
-  const wsHost = hostname.replace(/-3000\./, "-8000.");
-  const wsProto = protocol === "https:" ? "wss:" : "ws:";
-  return `${wsProto}//${wsHost}`;
-}
+type MessageHandler = (data: unknown) => void;
 
 export class ReconnectingWebSocket {
   private url: string;

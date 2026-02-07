@@ -1,8 +1,7 @@
 "use client";
 
 import type { Artifact } from "@/types";
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+import { getApiBase } from "@/lib/api-base";
 
 interface Props {
   artifacts: Artifact[];
@@ -26,7 +25,7 @@ export function ArtifactGallery({ artifacts }: Props) {
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={`${BASE_URL}${a.url}`}
+            src={`${getApiBase()}${a.url}`}
             alt={a.filename}
             className="w-full h-auto"
           />

@@ -1,8 +1,7 @@
 "use client";
 
 import { useCallback, useRef, useState } from "react";
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
+import { getApiBase } from "@/lib/api-base";
 
 function getApiKey(): string {
   if (typeof document === "undefined") return "";
@@ -87,7 +86,7 @@ export function useChat({ projectId, currentPage }: UseChatOptions = {}) {
         const key = getApiKey();
         if (key) headers["Authorization"] = `Bearer ${key}`;
 
-        const res = await fetch(`${BASE_URL}/api/chat`, {
+        const res = await fetch(`${getApiBase()}/api/chat`, {
           method: "POST",
           headers,
           body: JSON.stringify({

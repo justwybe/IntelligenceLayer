@@ -2,9 +2,8 @@
 
 import { useState } from "react";
 import { useEpisodeData } from "@/hooks/use-datasets";
+import { getApiBase } from "@/lib/api-base";
 import { TrajectoryChart } from "./trajectory-chart";
-
-const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? "";
 
 function getApiKey(): string {
   if (typeof document === "undefined") return "";
@@ -27,7 +26,7 @@ export function EpisodeViewer() {
 
   const data = episodeMutation.data;
   const videoUrl = data?.video_path
-    ? `${BASE_URL}/api/datasets/video?path=${encodeURIComponent(data.video_path)}&token=${encodeURIComponent(getApiKey())}`
+    ? `${getApiBase()}/api/datasets/video?path=${encodeURIComponent(data.video_path)}&token=${encodeURIComponent(getApiKey())}`
     : null;
 
   return (
