@@ -25,8 +25,8 @@ class Settings(BaseSettings):
     def get_origins(self) -> list[str]:
         """Return allowed origins, auto-adding RunPod proxy if on a pod."""
         origins = list(self.allowed_origins)
-        pod_id = os.environ.get("RUNPOD_POD_ID") or os.environ.get("HOSTNAME", "")
-        if pod_id and "." not in pod_id:
+        pod_id = os.environ.get("RUNPOD_POD_ID")
+        if pod_id:
             origins.append(f"https://{pod_id}-3000.proxy.runpod.net")
             origins.append(f"https://{pod_id}-8000.proxy.runpod.net")
         return origins

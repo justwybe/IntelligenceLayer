@@ -39,6 +39,15 @@ if [ ! -f .env ] || [ ! -f "$HOME/.wybe_studio/studio.db" ]; then
     bash "$PROJECT_DIR/scripts/restore_backup.sh" 2>/dev/null || echo "No backup found — continuing with fresh setup."
 fi
 
+# Ensure RUNPOD_POD_ID is in .env (needed for CORS when browser calls port-8000 directly)
+if [ -f /etc/rp_environment ]; then
+    source /etc/rp_environment
+fi
+if [ -n "$RUNPOD_POD_ID" ] && [ -f .env ] && ! grep -q "^RUNPOD_POD_ID=" .env 2>/dev/null; then
+    echo "RUNPOD_POD_ID=$RUNPOD_POD_ID" >> .env
+    echo "Added RUNPOD_POD_ID=$RUNPOD_POD_ID to .env"
+fi
+
 # Load env vars
 if [ -f .env ]; then
     set -a && source .env && set +a
