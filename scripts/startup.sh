@@ -32,8 +32,14 @@ echo '{"file_format_version":"1.0.0","ICD":{"library_path":"libGLX_nvidia.so.0",
 # Isaac Sim (optional — may fail if system Python 3.11 is not available)
 pip install isaacsim==5.1.0.0 2>/dev/null || true
 
-# Load env vars
+# Restore from backup if this is a fresh pod (no .env or DB)
 cd "$PROJECT_DIR"
+if [ ! -f .env ] || [ ! -f "$HOME/.wybe_studio/studio.db" ]; then
+    echo "Fresh pod detected — attempting restore from backup..."
+    bash "$PROJECT_DIR/scripts/restore_backup.sh" 2>/dev/null || echo "No backup found — continuing with fresh setup."
+fi
+
+# Load env vars
 if [ -f .env ]; then
     set -a && source .env && set +a
     echo "Environment variables loaded."
@@ -94,15 +100,17 @@ fi
 echo "Service status:"
 supervisorctl status
 
-# Install cron jobs for auto-deploy and health monitoring
+# Install cron jobs for auto-deploy, health monitoring, and backups
 echo "Installing cron jobs..."
 CRON_DEPLOY="*/5 * * * * cd $PROJECT_DIR && bash scripts/auto_deploy.sh >> $LOG_DIR/deploy.log 2>&1"
 CRON_HEALTH="*/2 * * * * cd $PROJECT_DIR && bash scripts/health_monitor.sh >> $LOG_DIR/health.log 2>&1"
+CRON_BACKUP="0 * * * * cd $PROJECT_DIR && bash scripts/backup.sh >> $LOG_DIR/backup.log 2>&1"
 (
-    crontab -l 2>/dev/null | grep -v 'auto_deploy.sh' | grep -v 'health_monitor.sh'
+    crontab -l 2>/dev/null | grep -v 'auto_deploy.sh' | grep -v 'health_monitor.sh' | grep -v 'backup.sh'
     echo "$CRON_DEPLOY"
     echo "$CRON_HEALTH"
+    echo "$CRON_BACKUP"
 ) | crontab -
-echo "Cron jobs installed (auto-deploy every 5m, health check every 2m)."
+echo "Cron jobs installed (auto-deploy every 5m, health check every 2m, backup hourly)."
 
 echo "=== Startup complete ==="

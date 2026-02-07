@@ -41,15 +41,17 @@ install_cron_job() {
     local LOG_DIR="/tmp/intelligenceLayer_logs"
     mkdir -p "$LOG_DIR"
 
-    log "Installing cron jobs (reboot, auto-deploy, health monitor)..."
+    log "Installing cron jobs (reboot, auto-deploy, health monitor, backup)..."
     CRON_REBOOT="@reboot cd /root/IntelligenceLayer && bash scripts/startup.sh >> $LOG_DIR/startup_cron.log 2>&1"
     CRON_DEPLOY="*/5 * * * * cd /root/IntelligenceLayer && bash scripts/auto_deploy.sh >> $LOG_DIR/deploy.log 2>&1"
     CRON_HEALTH="*/2 * * * * cd /root/IntelligenceLayer && bash scripts/health_monitor.sh >> $LOG_DIR/health.log 2>&1"
+    CRON_BACKUP="0 * * * * cd /root/IntelligenceLayer && bash scripts/backup.sh >> $LOG_DIR/backup.log 2>&1"
     (
-        crontab -l 2>/dev/null | grep -v 'scripts/startup.sh' | grep -v 'auto_deploy.sh' | grep -v 'health_monitor.sh'
+        crontab -l 2>/dev/null | grep -v 'scripts/startup.sh' | grep -v 'auto_deploy.sh' | grep -v 'health_monitor.sh' | grep -v 'backup.sh'
         echo "$CRON_REBOOT"
         echo "$CRON_DEPLOY"
         echo "$CRON_HEALTH"
+        echo "$CRON_BACKUP"
     ) | crontab -
     log "Cron jobs installed. Verify with: crontab -l"
 
