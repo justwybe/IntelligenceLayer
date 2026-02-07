@@ -65,6 +65,9 @@ if [ -s "$RESTORE_DIR/env" ]; then
     fi
     cp "$RESTORE_DIR/env" "$ENV_PATH"
     log ".env restored ($(wc -l < "$ENV_PATH") lines)"
+    if grep -q "REDACTED" "$ENV_PATH" 2>/dev/null; then
+        warn "API keys are redacted — update ANTHROPIC_API_KEY in .env manually."
+    fi
 else
     warn "No .env in backup."
 fi

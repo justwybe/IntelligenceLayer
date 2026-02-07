@@ -51,10 +51,11 @@ mkdir -p "$BACKUP_DIR"
 # Copy files to backup dir
 cp "$DB_PATH" "$BACKUP_DIR/studio.db" 2>/dev/null || true
 
-# Back up .env but redact secrets (store structure, not values)
+# Back up .env with secrets redacted (GitHub push protection blocks API keys)
 if [ -f "$ENV_PATH" ]; then
-    # Keep full .env — this is a private repo
-    cp "$ENV_PATH" "$BACKUP_DIR/env" 2>/dev/null || true
+    sed -E 's/(ANTHROPIC_API_KEY=).+/\1REDACTED/' "$ENV_PATH" \
+      | sed -E 's/(WYBE_API_KEY=).+/\1REDACTED/' \
+      > "$BACKUP_DIR/env" 2>/dev/null || true
 fi
 
 # Store pod metadata
