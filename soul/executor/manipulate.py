@@ -47,7 +47,9 @@ class Manipulator:
             self._client = PolicyClient(
                 host=self._config.groot_host,
                 port=self._config.groot_port,
+                timeout_ms=3000,
             )
+            self._client.ping()
             logger.info(
                 "Connected to GR00T policy server at %s:%d",
                 self._config.groot_host,
@@ -59,6 +61,7 @@ class Manipulator:
             return False
         except Exception as exc:
             logger.warning("Failed to connect to GR00T policy server: %s", exc)
+            self._client = None
             return False
 
     # -- public API ------------------------------------------------------------

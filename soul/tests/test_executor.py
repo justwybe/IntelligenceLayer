@@ -195,14 +195,13 @@ class TestNavigator:
         assert "SIM" in caplog.text
 
     def test_groot_enabled_without_package(self, groot_config):
-        """When GR00T is enabled but package is missing, falls back to simulation."""
-        nav = Navigator(groot_config)
-
-        # gr00t is not importable in the test environment, so _ensure_client
-        # will fail and navigate falls back to simulation via _ensure_client
-        # returning False
-        result = nav.navigate("Room 204")
-        assert result is True
+        """When GR00T is enabled but server is unreachable, falls back to simulation."""
+        # Mock the gr00t import to raise ImportError, ensuring consistent
+        # behavior whether or not the gr00t package is installed.
+        with patch.dict(sys.modules, {"gr00t": None, "gr00t.policy": None, "gr00t.policy.server_client": None}):
+            nav = Navigator(groot_config)
+            result = nav.navigate("Room 204")
+            assert result is True
 
     def test_with_injected_client(self, groot_config):
         """When a client is injected, it is used for navigation."""
