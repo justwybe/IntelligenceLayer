@@ -62,16 +62,24 @@ tensorrt = [
     "onnx>=1.20.0",
     "tensorrt>=10.14.1.48.post1",
 ]
+soul = [
+    "anthropic>=0.40.0",
+    "faster-whisper>=1.0.0",
+    "elevenlabs>=1.0.0",
+    "pyttsx3>=2.90",
+    "python-dotenv>=1.0.0",
+    "sounddevice>=0.5.0",
+]
 
 [tool.setuptools.packages.find]
 where = ["."]
-include = ["gr00t*", "frontend*", "api*"]
+include = ["gr00t*", "frontend*", "api*", "soul*"]
 
 [tool.uv.extra-build-dependencies]
 flash-attn = ["torch==2.7.0", "numpy==1.26.4"]
 
 [tool.pytest.ini_options]
-testpaths = ["frontend/tests", "api/tests"]
+testpaths = ["frontend/tests", "api/tests", "soul/tests"]
 timeout = 30
 
 [tool.ruff]
