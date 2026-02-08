@@ -9,6 +9,7 @@ broke).
 from __future__ import annotations
 
 import logging
+import os
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -43,6 +44,20 @@ class Speaker:
                 api_key=self._config.elevenlabs_api_key,
             )
             logger.info("ElevenLabs TTS initialised (voice=%s)", self._config.elevenlabs_voice_id)
+
+            # Pre-warm TLS connection to reduce first-call latency
+            if os.environ.get("SOUL_TTS_PREWARM", "").lower() in ("true", "1", "yes"):
+                try:
+                    self._elevenlabs_client.text_to_speech.convert(
+                        text=".",
+                        voice_id=self._config.elevenlabs_voice_id,
+                        model_id="eleven_turbo_v2_5",
+                        optimize_streaming_latency=3,
+                        output_format="mp3_22050_32",
+                    )
+                    logger.info("ElevenLabs TLS pre-warm complete")
+                except Exception as exc:
+                    logger.debug("ElevenLabs pre-warm failed (non-critical): %s", exc)
         except ImportError:
             logger.warning("elevenlabs package not installed — will use pyttsx3 fallback")
         except Exception as exc:
@@ -94,7 +109,10 @@ class Speaker:
             audio = self._elevenlabs_client.text_to_speech.convert(
                 text=text,
                 voice_id=self._config.elevenlabs_voice_id,
-                model_id="eleven_multilingual_v2",
+                model_id="eleven_turbo_v2_5",
+                optimize_streaming_latency=3,
+                output_format="mp3_22050_32",
+                language_code="nb",
             )
             # audio is a generator of bytes — consume it to play/save
             # In a real deployment this would stream to speakers.

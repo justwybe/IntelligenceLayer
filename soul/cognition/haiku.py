@@ -32,6 +32,17 @@ class HaikuEngine:
             )
         return self._client
 
+    @staticmethod
+    def _cached_system(system_prompt: str) -> list[dict]:
+        """Wrap system prompt in a cache_control block for prompt caching."""
+        return [
+            {
+                "type": "text",
+                "text": system_prompt,
+                "cache_control": {"type": "ephemeral"},
+            }
+        ]
+
     def respond(self, text: str, system_prompt: str) -> str:
         """Generate a conversational response.
 
@@ -49,7 +60,7 @@ class HaikuEngine:
         response = client.messages.create(
             model=self._config.haiku_model,
             max_tokens=self._config.haiku_max_tokens,
-            system=system_prompt,
+            system=self._cached_system(system_prompt),
             messages=[{"role": "user", "content": text}],
         )
         return response.content[0].text
@@ -68,7 +79,7 @@ class HaikuEngine:
         response = client.messages.create(
             model=self._config.haiku_model,
             max_tokens=256,  # Keep acknowledgments very short
-            system=system_prompt,
+            system=self._cached_system(system_prompt),
             messages=[{"role": "user", "content": text}],
         )
         return response.content[0].text

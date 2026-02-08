@@ -68,7 +68,13 @@ class SonnetEngine:
         response = client.messages.create(
             model=self._config.sonnet_model,
             max_tokens=self._config.sonnet_max_tokens,
-            system=system_prompt,
+            system=[
+                {
+                    "type": "text",
+                    "text": system_prompt,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
             messages=[{"role": "user", "content": text}],
         )
         raw = response.content[0].text

@@ -126,7 +126,9 @@ class TestHaikuEngine:
         mock_client.messages.create.assert_called_once()
         call_kwargs = mock_client.messages.create.call_args[1]
         assert call_kwargs["model"] == config.haiku_model
-        assert call_kwargs["system"] == "You are Wybe."
+        assert call_kwargs["system"] == [
+            {"type": "text", "text": "You are Wybe.", "cache_control": {"type": "ephemeral"}}
+        ]
 
     @patch("soul.cognition.haiku.anthropic")
     def test_acknowledge(self, mock_anthropic_mod, config, mock_anthropic_response):
@@ -381,7 +383,8 @@ class TestSoulBrain:
         assert result.resident_id == sample_resident
         # The system prompt should have been built with resident context
         call_kwargs = mock_client.messages.create.call_args[1]
-        assert "Martha" in call_kwargs["system"]
+        system_text = call_kwargs["system"][0]["text"]
+        assert "Martha" in system_text
 
     @patch("soul.cognition.haiku.anthropic")
     def test_emergency_with_haiku_failure_still_works(

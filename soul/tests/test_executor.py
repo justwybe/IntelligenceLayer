@@ -126,7 +126,10 @@ class TestSpeaker:
         mock_client.text_to_speech.convert.assert_called_once_with(
             text="Good morning!",
             voice_id="test-voice",
-            model_id="eleven_multilingual_v2",
+            model_id="eleven_turbo_v2_5",
+            optimize_streaming_latency=3,
+            output_format="mp3_22050_32",
+            language_code="nb",
         )
 
     def test_fallback_when_elevenlabs_fails(self, elevenlabs_config):

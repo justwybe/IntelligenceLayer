@@ -17,12 +17,12 @@ class SoulConfig:
     anthropic_api_key: str = ""
     haiku_model: str = "claude-haiku-4-5-20251001"
     sonnet_model: str = "claude-sonnet-4-5-20250929"
-    haiku_max_tokens: int = 1024
+    haiku_max_tokens: int = 256
     sonnet_max_tokens: int = 4096
 
     # -- Speech-to-Text --
     stt_enabled: bool = True
-    whisper_model: str = "base.en"
+    whisper_model: str = "base"
     whisper_device: str = "cpu"
 
     # -- Text-to-Speech --
