@@ -57,3 +57,4 @@ ANTHROPIC_API_KEY=REDACTED
 # CONTAINER=                             # Set if running inside Docker
 # ROS_LOCALHOST_ONLY=1                   # Restrict ROS2 to localhost
 WYBE_API_KEY=REDACTED
+RUNPOD_POD_ID=624dlv4qsqzlty
