@@ -36,6 +36,10 @@ class SoulConfig:
     groot_port: int = 5555
     groot_enabled: bool = False
 
+    # -- Speaker identification --
+    speaker_id_enabled: bool = True
+    speaker_id_threshold: float = 0.55
+
     # -- Memory --
     db_path: str = ""
     facility_name: str = "Wybe Care"
@@ -86,6 +90,8 @@ class SoulConfig:
             groot_host=_env("GROOT_HOST", cls.groot_host),
             groot_port=_int("GROOT_PORT", cls.groot_port),
             groot_enabled=_bool("GROOT_ENABLED", cls.groot_enabled),
+            speaker_id_enabled=_bool("SPEAKER_ID_ENABLED", cls.speaker_id_enabled),
+            speaker_id_threshold=_float("SPEAKER_ID_THRESHOLD", cls.speaker_id_threshold),
             db_path=_env("DB_PATH"),
             facility_name=_env("FACILITY_NAME", cls.facility_name),
             silence_timeout=_float("SILENCE_TIMEOUT", cls.silence_timeout),

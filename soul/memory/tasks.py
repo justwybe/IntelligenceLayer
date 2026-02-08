@@ -109,6 +109,18 @@ class TaskLogger:
         ).fetchall()
         return self._store._rows_to_list(rows)
 
+    def recent_summaries(
+        self, resident_id: str, limit: int = 5
+    ) -> list[dict]:
+        """Return recent conversations that have summaries."""
+        rows = self._store._conn.execute(
+            "SELECT started_at, summary FROM conversations "
+            "WHERE resident_id = ? AND summary IS NOT NULL "
+            "ORDER BY started_at DESC LIMIT ?",
+            (resident_id, limit),
+        ).fetchall()
+        return self._store._rows_to_list(rows)
+
     def recent_conversations(
         self, resident_id: str | None = None, limit: int = 10
     ) -> list[dict]:

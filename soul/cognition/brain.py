@@ -46,6 +46,7 @@ if TYPE_CHECKING:
     from soul.memory.preferences import PreferenceManager
     from soul.memory.residents import ResidentManager
     from soul.memory.store import SoulStore
+    from soul.memory.tasks import TaskLogger
 
 logger = logging.getLogger(__name__)
 
@@ -77,12 +78,14 @@ class SoulBrain:
         residents: ResidentManager,
         facility: FacilityManager,
         preferences: PreferenceManager,
+        task_logger: TaskLogger | None = None,
     ):
         self._config = config
         self._store = store
         self._residents = residents
         self._facility = facility
         self._preferences = preferences
+        self._task_logger = task_logger
         self._haiku = HaikuEngine(config)
         self._sonnet = SonnetEngine(config)
 
@@ -101,14 +104,32 @@ class SoulBrain:
     def _current_time(self) -> str:
         return datetime.now().strftime("%A, %B %d, %Y at %I:%M %p")
 
+    def _build_conversation_summaries(self, resident_id: str | None) -> str:
+        """Build a block of recent conversation summaries for the system prompt."""
+        if not resident_id or not self._task_logger:
+            return ""
+        summaries = self._task_logger.recent_summaries(resident_id, limit=5)
+        if not summaries:
+            return ""
+        lines = ["Previous conversations:"]
+        for s in summaries:
+            lines.append(f"- [{s['started_at']}]: {s['summary']}")
+        return "\n".join(lines)
+
     # -- main entry point --------------------------------------------------
 
-    def process(self, text: str, resident_id: str | None = None) -> InteractionResult:
+    def process(
+        self,
+        text: str,
+        resident_id: str | None = None,
+        history: list[dict] | None = None,
+    ) -> InteractionResult:
         """Process a single utterance and return a complete interaction result.
 
         Args:
             text: The transcribed utterance from the resident.
             resident_id: Optional known resident ID for context injection.
+            history: Optional prior messages for multi-turn context.
 
         Returns:
             InteractionResult with intent, response text, action plan, etc.
@@ -121,7 +142,7 @@ class SoulBrain:
         if intent.category == IntentCategory.EMERGENCY:
             return self._handle_emergency(text, intent, resident_id)
         elif intent.category in _HAIKU_ONLY_INTENTS:
-            return self._handle_simple(text, intent, resident_id)
+            return self._handle_simple(text, intent, resident_id, history=history)
         elif intent.category in _SONNET_INTENTS:
             return self._handle_complex(text, intent, resident_id)
         else:
@@ -180,11 +201,16 @@ class SoulBrain:
         )
 
     def _handle_simple(
-        self, text: str, intent: Intent, resident_id: str | None
+        self,
+        text: str,
+        intent: Intent,
+        resident_id: str | None,
+        history: list[dict] | None = None,
     ) -> InteractionResult:
         """Simple intents: Haiku-only response, speak-only plan."""
         resident_context = self._build_resident_context(resident_id)
         facility_context = self._build_facility_context()
+        conversation_summaries = self._build_conversation_summaries(resident_id)
 
         system_prompt = build_haiku_prompt(
             robot_name=self._config.robot_name,
@@ -192,9 +218,10 @@ class SoulBrain:
             resident_context=resident_context,
             facility_context=facility_context,
             current_time=self._current_time(),
+            conversation_summaries=conversation_summaries,
         )
 
-        response_text = self._haiku.respond(text, system_prompt)
+        response_text = self._haiku.respond(text, system_prompt, history=history)
         plan = ActionPlan.speak_only(response_text)
 
         return InteractionResult(

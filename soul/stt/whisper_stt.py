@@ -17,7 +17,7 @@ class WhisperSTT(BaseSTT):
 
     def __init__(
         self,
-        model_size: str = "base.en",
+        model_size: str = "small",
         device: str = "cpu",
         compute_type: str = "int8",
     ):
@@ -51,20 +51,16 @@ class WhisperSTT(BaseSTT):
 
     def transcribe(self, audio_data: bytes) -> Utterance | None:
         import io
-        import tempfile
 
         model = self._get_model()
 
-        # faster-whisper expects a file path or file-like object
-        with tempfile.NamedTemporaryFile(suffix=".wav", delete=True) as f:
-            f.write(audio_data)
-            f.flush()
-            segments, info = model.transcribe(
-                f.name,
-                beam_size=5,
-                language="en",
-                vad_filter=True,
-            )
+        # faster-whisper accepts file-like objects — avoid temp file I/O
+        segments, info = model.transcribe(
+            io.BytesIO(audio_data),
+            beam_size=1,
+            language="no",
+            vad_filter=True,
+        )
 
         text_parts = []
         total_duration = 0.0

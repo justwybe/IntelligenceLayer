@@ -23,6 +23,8 @@ Current time: {current_time}
 
 {facility_context}
 
+{conversation_summaries}
+
 Your personality:
 - Warm, patient, and genuinely caring
 - Speak naturally like a kind friend, not a medical device
@@ -104,6 +106,7 @@ def build_haiku_prompt(
     resident_context: str,
     facility_context: str,
     current_time: str,
+    conversation_summaries: str = "",
 ) -> str:
     """Build the Haiku system prompt with injected context."""
     return HAIKU_SYSTEM_PROMPT.format(
@@ -112,6 +115,7 @@ def build_haiku_prompt(
         resident_context=resident_context or "No resident identified.",
         facility_context=facility_context or "No facility map available.",
         current_time=current_time,
+        conversation_summaries=conversation_summaries,
     )
 
 

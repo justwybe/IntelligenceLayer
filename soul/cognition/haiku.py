@@ -43,12 +43,15 @@ class HaikuEngine:
             }
         ]
 
-    def respond(self, text: str, system_prompt: str) -> str:
+    def respond(
+        self, text: str, system_prompt: str, history: list[dict] | None = None
+    ) -> str:
         """Generate a conversational response.
 
         Args:
             text: The user's utterance.
             system_prompt: The fully-built system prompt with context injected.
+            history: Optional prior messages ``[{"role": ..., "content": ...}, ...]``.
 
         Returns:
             The model's text response.
@@ -57,11 +60,13 @@ class HaikuEngine:
             anthropic.APIError: On API failure (fail-fast, no retries).
         """
         client = self._get_client()
+        messages = list(history or [])
+        messages.append({"role": "user", "content": text})
         response = client.messages.create(
             model=self._config.haiku_model,
             max_tokens=self._config.haiku_max_tokens,
             system=self._cached_system(system_prompt),
-            messages=[{"role": "user", "content": text}],
+            messages=messages,
         )
         return response.content[0].text
 
@@ -81,5 +86,18 @@ class HaikuEngine:
             max_tokens=256,  # Keep acknowledgments very short
             system=self._cached_system(system_prompt),
             messages=[{"role": "user", "content": text}],
+        )
+        return response.content[0].text
+
+    def summarize(self, messages: list[dict]) -> str:
+        """Summarize a conversation into 1-2 sentences."""
+        transcript = "\n".join(f"{m['role']}: {m['content']}" for m in messages)
+        client = self._get_client()
+        response = client.messages.create(
+            model=self._config.haiku_model,
+            max_tokens=128,
+            system="Summarize this care-home conversation in 1-2 sentences in Norwegian. "
+            "Focus on what the resident wanted and any preferences learned.",
+            messages=[{"role": "user", "content": transcript}],
         )
         return response.content[0].text

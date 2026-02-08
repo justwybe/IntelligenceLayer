@@ -22,7 +22,7 @@ class TestSoulStore:
 
     def test_schema_version(self, store):
         row = store._conn.execute("SELECT version FROM schema_version").fetchone()
-        assert row["version"] == 1
+        assert row["version"] == 2
 
     def test_idempotent_migration(self, db_path):
         """Running migration twice doesn't error."""
@@ -30,7 +30,7 @@ class TestSoulStore:
         s1.close()
         s2 = SoulStore(db_path=db_path)
         row = s2._conn.execute("SELECT version FROM schema_version").fetchone()
-        assert row["version"] == 1
+        assert row["version"] == 2
         s2.close()
 
     def test_wal_mode(self, store):

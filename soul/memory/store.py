@@ -16,7 +16,7 @@ import uuid
 
 logger = logging.getLogger(__name__)
 
-_SCHEMA_VERSION = 1
+_SCHEMA_VERSION = 2
 
 
 def _default_db_path() -> str:
@@ -160,6 +160,19 @@ class SoulStore:
                     ON conversations(resident_id);
                 CREATE INDEX IF NOT EXISTS idx_conv_messages_conv
                     ON conversation_messages(conversation_id);
+            """)
+
+        if current_version < 2:
+            c.executescript("""
+                CREATE TABLE IF NOT EXISTS speaker_embeddings (
+                    id TEXT PRIMARY KEY,
+                    resident_id TEXT NOT NULL REFERENCES residents(id),
+                    embedding BLOB NOT NULL,
+                    audio_duration REAL,
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                );
+                CREATE INDEX IF NOT EXISTS idx_speaker_emb_resident
+                    ON speaker_embeddings(resident_id);
             """)
 
         if current_version == 0:

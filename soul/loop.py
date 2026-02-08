@@ -38,6 +38,7 @@ class SoulLoop:
         self._brain = None
         self._dispatcher = None
         self._stt: BaseSTT | None = None
+        self._speaker_id = None
 
         # State
         self._current_resident_id: str | None = None
@@ -75,6 +76,7 @@ class SoulLoop:
                 residents=self.residents,
                 facility=self.facility,
                 preferences=self.preferences,
+                task_logger=self.task_logger,
             )
         return self._brain
 
@@ -94,6 +96,27 @@ class SoulLoop:
             )
         return self._dispatcher
 
+    def _get_speaker_id(self):
+        if self._speaker_id is None:
+            from soul.stt.speaker_id import SpeakerIdentifier
+            self._speaker_id = SpeakerIdentifier(
+                self.store, self.config.speaker_id_threshold
+            )
+        return self._speaker_id
+
+    def identify_speaker(self, audio_data: bytes) -> str | None:
+        """Identify speaker from audio. Returns resident_id or None."""
+        if not self.config.speaker_id_enabled:
+            return None
+        try:
+            sid = self._get_speaker_id()
+            if not sid.is_available():
+                return None
+            return sid.identify(audio_data)
+        except Exception as exc:
+            logger.warning("Speaker identification failed: %s", exc)
+            return None
+
     def set_resident(self, resident_id: str | None) -> None:
         """Set the current resident for context."""
         self._current_resident_id = resident_id
@@ -102,17 +125,31 @@ class SoulLoop:
             if r:
                 logger.info("Active resident: %s", r["name"])
 
-    def process_text(self, text: str) -> dict:
+    def _build_history(self) -> list[dict]:
+        """Build message history from the current conversation (capped at 20)."""
+        if not self._current_conversation_id:
+            return []
+        raw = self.task_logger.get_conversation_messages(self._current_conversation_id)
+        history = [{"role": m["role"], "content": m["content"]} for m in raw]
+        return history[-20:]
+
+    def process_text(self, text: str, skip_speak: bool = False) -> dict:
         """Process a text input through the full pipeline.
+
+        If *skip_speak* is True, SPEAK actions and interim speech are skipped
+        (useful when the caller handles audio output separately).
 
         Returns a dict with: response_text, actions_executed, model_used, intent.
         """
         brain = self._get_brain()
         dispatcher = self._get_dispatcher()
 
+        # Build conversation history for multi-turn context
+        history = self._build_history()
+
         # Think
         t0 = time.monotonic()
-        result = brain.process(text, resident_id=self._current_resident_id)
+        result = brain.process(text, resident_id=self._current_resident_id, history=history)
         think_time = time.monotonic() - t0
         logger.info(
             "Brain processed in %.0fms: intent=%s model=%s",
@@ -121,13 +158,13 @@ class SoulLoop:
             result.model_used,
         )
 
-        # Speak interim response if available
-        if result.interim_response:
+        # Speak interim response if available (skip in web UI mode)
+        if result.interim_response and not skip_speak:
             dispatcher.speak(result.interim_response)
 
         # Execute action plan
         t1 = time.monotonic()
-        action_results = dispatcher.execute(result.action_plan)
+        action_results = dispatcher.execute(result.action_plan, skip_speak=skip_speak)
         act_time = time.monotonic() - t1
         logger.info("Actions executed in %.0fms", act_time * 1000)
 
@@ -167,8 +204,22 @@ class SoulLoop:
         return self._current_conversation_id
 
     def end_conversation(self, summary: str | None = None) -> None:
-        """End the current conversation."""
+        """End the current conversation, auto-summarizing if no summary given."""
         if self._current_conversation_id:
+            if summary is None:
+                msgs = self.task_logger.get_conversation_messages(
+                    self._current_conversation_id
+                )
+                if len(msgs) >= 2:
+                    try:
+                        brain = self._get_brain()
+                        result = brain._haiku.summarize(
+                            [{"role": m["role"], "content": m["content"]} for m in msgs]
+                        )
+                        if isinstance(result, str):
+                            summary = result
+                    except Exception as exc:
+                        logger.warning("Failed to summarize conversation: %s", exc)
             self.task_logger.end_conversation(
                 self._current_conversation_id, summary=summary
             )

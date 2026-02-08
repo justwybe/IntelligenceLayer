@@ -60,8 +60,15 @@ class Dispatcher:
         """Convenience: speak text directly via the Speaker."""
         self._speaker.speak(text)
 
-    def execute(self, plan: ActionPlan) -> list[ActionResult]:
+    def synthesize(self, text: str) -> bytes | None:
+        """Generate audio bytes for text via the Speaker."""
+        return self._speaker.synthesize(text)
+
+    def execute(self, plan: ActionPlan, skip_speak: bool = False) -> list[ActionResult]:
         """Execute all actions in *plan* respecting dependency order.
+
+        If *skip_speak* is True, SPEAK actions are skipped (useful when the
+        caller handles audio output separately, e.g. via Gradio).
 
         Returns a list of :class:`ActionResult`, one per action.
         """
@@ -72,6 +79,17 @@ class Dispatcher:
 
         for idx in execution_order:
             action = plan.actions[idx]
+
+            # Skip SPEAK actions when caller handles audio output
+            if skip_speak and action.action_type == ActionType.SPEAK:
+                result = ActionResult(
+                    action_index=idx,
+                    success=True,
+                    result_text=action.parameters.get("text", ""),
+                )
+                results.append(result)
+                completed[idx] = result
+                continue
 
             # Check that all dependencies succeeded
             dep_failed = self._check_dependencies(action, completed)
